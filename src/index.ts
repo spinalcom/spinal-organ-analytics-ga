@@ -28,6 +28,16 @@ import { SpinalContext, SpinalGraph, SpinalNode } from "spinal-model-graph";
 import config from "./config";
 import { SpinalGraphService } from "spinal-env-viewer-graph-service";
 import { spinalAnalyticService } from "spinal-env-viewer-plugin-analytics-service";
+import { NetworkService } from "spinal-model-bmsnetwork";
+import {
+    SpinalDateValue,
+    SpinalDateValueArray,
+    SpinalServiceTimeseries,
+    SpinalTimeSeries,
+    SpinalTimeSeriesArchive,
+    SpinalTimeSeriesArchiveDay,
+} from 'spinal-model-timeseries';
+
 
 
 
@@ -55,14 +65,14 @@ class SpinalMain {
 
 
 
-    private async getAnalytics(){
+    private async getAnalytics() {
         const contexts = await spinalAnalyticService.getContexts();
-        for(const context of contexts){
+        for (const context of contexts) {
             const contextId = context.id.get();
 
             //console.log(contextId);
-            return SpinalGraphService.findInContext(contextId,contextId,(node: SpinalNode<any>) => {
-                if(node.getType().get() == spinalAnalyticService.nodeType){
+            return SpinalGraphService.findInContext(contextId, contextId, (node: SpinalNode<any>) => {
+                if (node.getType().get() == spinalAnalyticService.nodeType) {
                     (<any>SpinalGraphService)._addNode(node)
                     return true;
                 }
@@ -71,53 +81,138 @@ class SpinalMain {
 
         }
     }
-    public async getNumberTicket(nodeId: string){
+
+    ////////////////////////////////////////////////////////////
+    /////////////// TICKET ANALYTICS ///////////////////////////
+    ////////////////////////////////////////////////////////////
+
+    public async getNumberTicket(nodeId: string) {
         const node = SpinalGraphService.getRealNode(nodeId);
         //console.log(node)
-        const tickets = await SpinalGraphService.getChildren(nodeId,["SpinalSystemServiceTicketHasTicket"]);
+        const tickets = await SpinalGraphService.getChildren(nodeId, ["SpinalSystemServiceTicketHasTicket"]);
         //console.log(tickets);
         return tickets.length;
     }
 
-    public async getRoomTicketCount(nodeId:string){
+    public async getRoomTicketCount(nodeId: string) {
         const node = SpinalGraphService.getRealNode(nodeId);
-        const equipments = await SpinalGraphService.getChildren(nodeId,["hasBimObject"]);
+        const equipments = await SpinalGraphService.getChildren(nodeId, ["hasBimObject"]);
         let res = await this.getNumberTicket(nodeId);
-        for (const equipment of equipments ){
+        for (const equipment of equipments) {
             res += await this.getNumberTicket(equipment.id.get());
         }
         return res;
-        
+
     }
 
-    public async getFloorTicketCount(nodeId:string){
+    public async getFloorTicketCount(nodeId: string) {
         const node = SpinalGraphService.getRealNode(nodeId);
-        const rooms= await SpinalGraphService.getChildren(nodeId,["hasGeographicRoom"]);
+        const rooms = await SpinalGraphService.getChildren(nodeId, ["hasGeographicRoom"]);
         let res = await this.getNumberTicket(nodeId);
-        for (const room of rooms ){
+        for (const room of rooms) {
             res += await this.getRoomTicketCount(room.id.get());
         }
         return res;
     }
 
-    public async getBuildingTicketCount(nodeId:string){
+    public async getBuildingTicketCount(nodeId: string) {
         const node = SpinalGraphService.getRealNode(nodeId);
-        const floors= await SpinalGraphService.getChildren(nodeId,["hasGeographicFloor"]);
+        const floors = await SpinalGraphService.getChildren(nodeId, ["hasGeographicFloor"]);
         let res = await this.getNumberTicket(nodeId);
-        for (const floor of floors ){
+        for (const floor of floors) {
             res += await this.getFloorTicketCount(floor.id.get());
         }
         return res;
     }
+
+    public async filterBmsEndpoint(endpointList: any, filter: string) {
+        let outputBmsEndpoint = [];
+        for (const endpoint of endpointList) {
+            let bmsEndpoints = await SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpoint"]);
+            for (const bms of bmsEndpoints) {
+                if (bms.name.get().includes(filter)) outputBmsEndpoint.push(bms);
+                // if(bms.name.get().includes(filter)) outputBmsEndpoint.push(bms.name.get());
+            }
+        }
+        return outputBmsEndpoint;
+
+    }
+
+    public async sumTimeSeriesOfBmsEndpoints(bmsEndpoints: any) {
+        const networkService = new NetworkService();
+        // console.log(bmsEndpoints);
+        let sum = 0;
+        for (let bms of bmsEndpoints) {
+            // console.log(bms);
+            let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
+            // console.log(timeSeriesModel);
+            let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
+            // console.log(timeSeriesNode);
+            let spinalTs = await timeSeriesNode.getElement();
+            let currentData = await spinalTs.getCurrent();
+            // console.log("current data : " + currentData.value);
+            sum += currentData.value;
+            // let testValue = await networkService.getData(bms.id.get());
+            // console.log(testValue);
+        }
+        // console.log(sum);
+        return sum;
+    }
+
+    ///////////////////////////////////////////////////
+    //////////////// CONSOMMATION  ANALYTICS //////////
+    ///////////////////////////////////////////////////
+
+
+    public async calculateAnalyticsGlobalEnergy(controlBmsEndpointId: string, elementId: string, typeOfElement: string) {
+        let endpointList = [];
+        if (typeOfElement == "geographicBuilding") {
+            let filter = "Comptage Energie Active Total";
+            endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+            let bmsEndpoints = await this.filterBmsEndpoint(endpointList, filter);
+            let sum = await this.sumTimeSeriesOfBmsEndpoints(bmsEndpoints);
+            return sum;
+        }
+        else if (typeOfElement == "geographicFloor") {
+            // console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
+        }
+        else {
+            console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
+        }
+    }
+
+    public async calculateAnalyticsGlobalCVC(controlBmsEndpointId: string, elementId: string, typeOfElement: string) {
+        let endpointList = [];
+        if (typeOfElement == "geographicBuilding") {
+            let filter = "CVC";
+            endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+            let bmsEndpoints = await this.filterBmsEndpoint(endpointList, filter);
+            let sum = await this.sumTimeSeriesOfBmsEndpoints(bmsEndpoints);
+            return sum;
+            // console.log(bmsEndpoints);
+        }
+        else if (typeOfElement == "geographicFloor") {
+            // console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
+        }
+        else {
+            console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
+        }
+    }
+
     
-    public async getEndpoints(nodeId:string, nameFilter:string){
+
+
+
+
+
+    public async getEndpoints(nodeId: string, nameFilter: string) {
         const element_to_endpoint_relation = "hasEndPoint"
         const node = SpinalGraphService.getRealNode(nodeId);
-        const EndpointProfils = await SpinalGraphService.getChildren(nodeId,[element_to_endpoint_relation]);
-        for(const endpointProfil of EndpointProfils){ // pour chaque profil de control endpoint
-            const endpointsModels = await SpinalGraphService.getChildren(endpointProfil.id.get(),["hasBmsEndpoint"]);
+        const EndpointProfils = await SpinalGraphService.getChildren(nodeId, [element_to_endpoint_relation]);
+        for (const endpointProfil of EndpointProfils) { // pour chaque profil de control endpoint
+            const endpointsModels = await SpinalGraphService.getChildren(endpointProfil.id.get(), ["hasBmsEndpoint"]);
             const endpoints = endpointsModels.map(el => el.get());
-            for(const endpoint of endpoints){
+            for (const endpoint of endpoints) {
                 if (endpoint.name.get() == nameFilter) return endpoint.id.get() // !!!! A CHANGER !!!!!
             }
 
@@ -140,22 +235,22 @@ class SpinalMain {
     //     return undefined;
     // }
 
-    public async getControlEndpoint(nodeId:string, nameFilter:string){
+    public async getControlEndpoint(nodeId: string, nameFilter: string) {
         const NODE_TO_CONTROL_POINTS_RELATION = spinalControlPointService.ROOM_TO_CONTROL_GROUP // "hasControlPoints"
         const CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
         let allControlPoints = await SpinalGraphService.getChildren(nodeId, [NODE_TO_CONTROL_POINTS_RELATION]);
-        for(let controlPoint of allControlPoints){
+        for (let controlPoint of allControlPoints) {
             let allBmsEndpoints = await SpinalGraphService.getChildren(controlPoint.id.get(), [CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION]);
             let test = allBmsEndpoints.filter(elt => elt.name.get() == nameFilter);
-            if(test.length !=0) return test[0];
+            if (test.length != 0) return test[0];
         }
         return false;
     }
 
     // Update control points with correct values
-    public async updateControlEndpoints(){
+    public async updateControlEndpoints() {
         const analytics = await this.getAnalytics();
-        for (const analytic of analytics){
+        for (const analytic of analytics) {
 
             // récupération du nom de l'analytic et du type d'analytic ciblé
             let analyticChildrenType = analytic.childrenType.get();
@@ -167,64 +262,71 @@ class SpinalMain {
             const nodesToUpdate = await this.getAnalyticChildren(contextId,analytic.id.get(),analytic.childrenType.get());
             console.log(nodesToUpdate);*/
 
-            const groups = await SpinalGraphService.getChildren(analytic.id.get(),[spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
-            for (const group of groups){
+            const groups = await SpinalGraphService.getChildren(analytic.id.get(), [spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
+            for (const group of groups) {
                 const elements = await SpinalGraphService.getChildren(group.id.get()); // récupération du gorupe auquel est lié l'analytic
-                for (const element of elements){
+                for (const element of elements) {
                     // récupération des noeuds du bon type
                     const typeOfElement = element.type.get();
-                    if(typeOfElement == analyticChildrenType){
+                    if (typeOfElement == analyticChildrenType) {
                         // Récupération du controlpoint lié avec le nom de l'analytic
                         let controlBmsEndpoint = await this.getControlEndpoint(element.id.get(), analyticName); // sortie
-                        if(controlBmsEndpoint != false){
-                            switch(analyticName){
+                        if (controlBmsEndpoint != false) {
+                            let analyticsResult = undefined;
+                            switch (analyticName) {
                                 case "Energie globale":
-                                    console.log("ok");
+                                    analyticsResult = await this.calculateAnalyticsGlobalEnergy(controlBmsEndpoint.id.get(), element.id.get(), typeOfElement);
+                                    console.log(analyticName + " for " + typeOfElement + " = " + analyticsResult);
                                     break;
                                 case "Chauffage":
-                                    console.log("ok");
+                                    // console.log(analyticName + " for " + typeOfElement + " = " + analyticsResult);
+                                    // console.log("ok");
                                     break;
                                 case "Climatisation":
-                                    console.log("ok");
+                                    analyticsResult = await this.calculateAnalyticsGlobalCVC(controlBmsEndpoint.id.get(), element.id.get(), typeOfElement);
+                                    console.log(analyticName + " for " + typeOfElement + " = " + analyticsResult);
+                                    // console.log("ok");
                                     break;
                                 case "Eclairage":
-                                    console.log("ok");
+                                    // console.log(analyticName + " for " + typeOfElement + " = " + analyticsResult);
+                                    // console.log("ok");
                                     break;
                                 case "Eau":
-                                    console.log("ok");
+                                    // console.log(analyticName + " for " + typeOfElement + " = " + analyticsResult);
+                                    // console.log("ok");
                                     break;
                                 case "Production d'énergie":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Ensoleillement":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Efficacité de production d'énergie solaire":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Gain en émission de CO2":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Taux d'autoconsommation énergétique":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Qualité de l'air":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Luminosité":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Temperature moyenne":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Nombre d'espaces occupés":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Taux d'occupation":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 case "Nombre de tickets":
-                                    console.log("ok");
+                                    // console.log("ok");
                                     break;
                                 default:
                                     console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
@@ -233,32 +335,35 @@ class SpinalMain {
                                     break;
                             }
                         }
-                        
+
                         // console.log(controlBmsEndpoint);
 
                     }
 
-                    
+
 
                     // console.log(element);
                 }
             }
 
-            
+
         }
-        
+
 
     }
 
 }
 
-async function Main(){
+async function Main() {
+    // const networkService = new NetworkService();
     const spinalMain = new SpinalMain();
     await spinalMain.init();
-    
+    console.log(NetworkService);
+    console.log(SpinalTimeSeries);
+
     ///// TODO ////
     spinalMain.updateControlEndpoints();
-    
+
 
 
 }
