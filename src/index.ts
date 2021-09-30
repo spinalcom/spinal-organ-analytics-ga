@@ -28,23 +28,14 @@ import { SpinalContext, SpinalGraph, SpinalNode } from "spinal-model-graph";
 import config from "./config";
 import { SpinalGraphService } from "spinal-env-viewer-graph-service";
 import { spinalAnalyticService } from "spinal-env-viewer-plugin-analytics-service";
-import { NetworkService } from "spinal-model-bmsnetwork";
-import {
-    SpinalDateValue,
-    SpinalDateValueArray,
-    SpinalServiceTimeseries,
-    SpinalTimeSeries,
-    SpinalTimeSeriesArchive,
-    SpinalTimeSeriesArchiveDay,
-} from 'spinal-model-timeseries';
-
-
+import { InputDataEndpointDataType, NetworkService, InputDataEndpoint, InputDataEndpointType}  from "spinal-model-bmsnetwork"
+import { SpinalTimeSeries } from "spinal-model-timeseries"
 
 
 
 class SpinalMain {
     constructor() { }
-
+    
     /**
      * 
      * Initialize connection with the hub and load graph
@@ -63,40 +54,36 @@ class SpinalMain {
         });
     }
 
-
+    public NetworkService = new NetworkService()
 
     private async getAnalytics() {
         const contexts = await spinalAnalyticService.getContexts();
         for (const context of contexts) {
             const contextId = context.id.get();
-
-            //console.log(contextId);
-            return SpinalGraphService.findInContext(contextId, contextId, (node: SpinalNode<any>) => {
-                if (node.getType().get() == spinalAnalyticService.nodeType) {
-                    (<any>SpinalGraphService)._addNode(node)
-                    return true;
-                }
-                else return false;
-            })
-
+            if(context.type.get() == "AnalyticGroupContext"){
+                return SpinalGraphService.findInContext(contextId,contextId,(node: SpinalNode<any>) => {
+                    if(node.getType().get() == spinalAnalyticService.nodeType){
+                        (<any>SpinalGraphService)._addNode(node)
+                        return true;
+                    }
+                    else return false;
+                })
+            }
+            else return undefined
         }
     }
 
-    ////////////////////////////////////////////////////////////
-    /////////////// TICKET ANALYTICS ///////////////////////////
-    ////////////////////////////////////////////////////////////
 
-    public async getNumberTicket(nodeId: string) {
-        const node = SpinalGraphService.getRealNode(nodeId);
+
+    public async getNumberTicket(nodeId: string){
         //console.log(node)
         const tickets = await SpinalGraphService.getChildren(nodeId, ["SpinalSystemServiceTicketHasTicket"]);
         //console.log(tickets);
         return tickets.length;
     }
 
-    public async getRoomTicketCount(nodeId: string) {
-        const node = SpinalGraphService.getRealNode(nodeId);
-        const equipments = await SpinalGraphService.getChildren(nodeId, ["hasBimObject"]);
+    public async getRoomTicketCount(nodeId:string){
+        const equipments = await SpinalGraphService.getChildren(nodeId,["hasBimObject"]);
         let res = await this.getNumberTicket(nodeId);
         for (const equipment of equipments) {
             res += await this.getNumberTicket(equipment.id.get());
@@ -105,9 +92,8 @@ class SpinalMain {
 
     }
 
-    public async getFloorTicketCount(nodeId: string) {
-        const node = SpinalGraphService.getRealNode(nodeId);
-        const rooms = await SpinalGraphService.getChildren(nodeId, ["hasGeographicRoom"]);
+    public async getFloorTicketCount(nodeId:string){
+        const rooms= await SpinalGraphService.getChildren(nodeId,["hasGeographicRoom"]);
         let res = await this.getNumberTicket(nodeId);
         for (const room of rooms) {
             res += await this.getRoomTicketCount(room.id.get());
@@ -115,9 +101,8 @@ class SpinalMain {
         return res;
     }
 
-    public async getBuildingTicketCount(nodeId: string) {
-        const node = SpinalGraphService.getRealNode(nodeId);
-        const floors = await SpinalGraphService.getChildren(nodeId, ["hasGeographicFloor"]);
+    public async getBuildingTicketCount(nodeId:string){
+        const floors= await SpinalGraphService.getChildren(nodeId,["hasGeographicFloor"]);
         let res = await this.getNumberTicket(nodeId);
         for (const floor of floors) {
             res += await this.getFloorTicketCount(floor.id.get());
@@ -199,6 +184,34 @@ class SpinalMain {
         }
     }
 
+
+    public async calculateTicket(nodeId : string, nodeType : string, targetNode){
+        let count = 0;
+        //console.log(targetNode.element.load());
+        if(nodeType == "geographicBuilding") {
+            count = await this.getBuildingTicketCount(nodeId);
+        }
+        else if (nodeType == "geographicFloor"){
+            count = await this.getFloorTicketCount(nodeId);
+        }
+
+        console.log(count);
+        const input : InputDataEndpoint = {
+            id: "",
+            name: "",
+            path: "",
+            currentValue: count,
+            unit: "",
+            dataType: InputDataEndpointDataType.Integer,
+            type: InputDataEndpointType.Other,
+            nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
+
+        };
+
+        await this.NetworkService.updateEndpoint(targetNode,input);
+        console.log("ControlEndpoint Nombre de tickets updated");
+        
+    }
     
 
 
@@ -220,22 +233,7 @@ class SpinalMain {
         return undefined;
     }
 
-    // public async getControlEndpoint(nodeId: string, nameFilter:string)  {
-    //     const element_to_controlendpoint_relation = spinalControlPointService.ROOM_TO_CONTROL_GROUP // "hasControlPoints"
-    //     const node = SpinalGraphService.getRealNode(nodeId);
-    //     const ControlEndpointProfils = await SpinalGraphService.getChildren(nodeId,[element_to_controlendpoint_relation]);
-    //     for(const endpointProfil of ControlEndpointProfils){ // pour chaque profil de control endpoint
-    //         const controlEndpointsModels = await SpinalGraphService.getChildren(endpointProfil.id.get(),["hasBmsEndpoint"]);
-    //         const controlEndpoints = controlEndpointsModels.map(el => el.get());
-    //         for(const controlEndpoint of controlEndpoints){
-    //             if (controlEndpoint.name.get() == nameFilter) return controlEndpoint;
-    //         }
-
-    //     }
-    //     return undefined;
-    // }
-
-    public async getControlEndpoint(nodeId: string, nameFilter: string) {
+    public async getControlEndpoint(nodeId:string, nameFilter:string){
         const NODE_TO_CONTROL_POINTS_RELATION = spinalControlPointService.ROOM_TO_CONTROL_GROUP // "hasControlPoints"
         const CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
         let allControlPoints = await SpinalGraphService.getChildren(nodeId, [NODE_TO_CONTROL_POINTS_RELATION]);
@@ -326,6 +324,7 @@ class SpinalMain {
                                     // console.log("ok");
                                     break;
                                 case "Nombre de tickets":
+                                    this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
                                     // console.log("ok");
                                     break;
                                 default:
