@@ -19,7 +19,9 @@
     "spinal-env-viewer-plugin-analytics-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-analytics-service.git",
     "spinal-env-viewer-plugin-control-endpoint-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-control-endpoint-service.git",
     "spinal-env-viewer-plugin-group-manager-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-group-manager-service.git",
-    "spinal-model-graph": "git+https://github.com/spinalcom/spinal-model-graph.git"
+    "spinal-model-graph": "git+https://github.com/spinalcom/spinal-model-graph.git",
+    "spinal-model-bmsnetwork": "git+https://github.com/spinalcom/spinal-model-bmsnetwork.git",
+    "spinal-model-timeseries": "git+https://github.com/spinalcom/spinal-model-timeseries.git"
   },
   "devDependencies": {
     "typescript": "^4.4.3"

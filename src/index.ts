@@ -31,15 +31,6 @@ import { spinalAnalyticService } from "spinal-env-viewer-plugin-analytics-servic
 
 
 
- 
-
-
-
-
-
-
-
-
 
 class SpinalMain {
     constructor() { }
@@ -80,13 +71,45 @@ class SpinalMain {
 
         }
     }
-
-    private async getAnalyticChildren(contextId:string,analyticId:string,childrenType:string){
-        return SpinalGraphService.findInContextByType(contextId,analyticId,childrenType);
+    public async getNumberTicket(nodeId: string){
+        const node = SpinalGraphService.getRealNode(nodeId);
+        //console.log(node)
+        const tickets = await SpinalGraphService.getChildren(nodeId,["SpinalSystemServiceTicketHasTicket"]);
+        //console.log(tickets);
+        return tickets.length;
     }
 
+    public async getRoomTicketCount(nodeId:string){
+        const node = SpinalGraphService.getRealNode(nodeId);
+        const equipments = await SpinalGraphService.getChildren(nodeId,["hasBimObject"]);
+        let res = await this.getNumberTicket(nodeId);
+        for (const equipment of equipments ){
+            res += await this.getNumberTicket(equipment.id.get());
+        }
+        return res;
+        
+    }
 
+    public async getFloorTicketCount(nodeId:string){
+        const node = SpinalGraphService.getRealNode(nodeId);
+        const rooms= await SpinalGraphService.getChildren(nodeId,["hasGeographicRoom"]);
+        let res = await this.getNumberTicket(nodeId);
+        for (const room of rooms ){
+            res += await this.getRoomTicketCount(room.id.get());
+        }
+        return res;
+    }
 
+    public async getBuildingTicketCount(nodeId:string){
+        const node = SpinalGraphService.getRealNode(nodeId);
+        const floors= await SpinalGraphService.getChildren(nodeId,["hasGeographicFloor"]);
+        let res = await this.getNumberTicket(nodeId);
+        for (const floor of floors ){
+            res += await this.getFloorTicketCount(floor.id.get());
+        }
+        return res;
+    }
+    
     public async getEndpoints(nodeId:string, nameFilter:string){
         const element_to_endpoint_relation = "hasEndPoint"
         const node = SpinalGraphService.getRealNode(nodeId);
@@ -127,12 +150,6 @@ class SpinalMain {
             if(test.length !=0) return test[0];
         }
         return false;
-    }
-
-    private getNodeContext(nodeId:string) : string{
-        const node = SpinalGraphService.getRealNode(nodeId);
-        return node.getContextIds()[0];
-        //return node.contextIds._attribute_names[0];
     }
 
     // Update control points with correct values

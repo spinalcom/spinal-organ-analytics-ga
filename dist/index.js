@@ -73,9 +73,46 @@ class SpinalMain {
             }
         });
     }
-    getAnalyticChildren(contextId, analyticId, childrenType) {
+    getNumberTicket(nodeId) {
         return __awaiter(this, void 0, void 0, function* () {
-            return spinal_env_viewer_graph_service_1.SpinalGraphService.findInContextByType(contextId, analyticId, childrenType);
+            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
+            //console.log(node)
+            const tickets = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["SpinalSystemServiceTicketHasTicket"]);
+            //console.log(tickets);
+            return tickets.length;
+        });
+    }
+    getRoomTicketCount(nodeId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
+            const equipments = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasBimObject"]);
+            let res = yield this.getNumberTicket(nodeId);
+            for (const equipment of equipments) {
+                res += yield this.getNumberTicket(equipment.id.get());
+            }
+            return res;
+        });
+    }
+    getFloorTicketCount(nodeId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
+            const rooms = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasGeographicRoom"]);
+            let res = yield this.getNumberTicket(nodeId);
+            for (const room of rooms) {
+                res += yield this.getRoomTicketCount(room.id.get());
+            }
+            return res;
+        });
+    }
+    getBuildingTicketCount(nodeId) {
+        return __awaiter(this, void 0, void 0, function* () {
+            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
+            const floors = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasGeographicFloor"]);
+            let res = yield this.getNumberTicket(nodeId);
+            for (const floor of floors) {
+                res += yield this.getFloorTicketCount(floor.id.get());
+            }
+            return res;
         });
     }
     getEndpoints(nodeId, nameFilter) {
@@ -120,11 +157,6 @@ class SpinalMain {
             }
             return false;
         });
-    }
-    getNodeContext(nodeId) {
-        const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
-        return node.getContextIds()[0];
-        //return node.contextIds._attribute_names[0];
     }
     // Update control points with correct values
     updateControlEndpoints() {

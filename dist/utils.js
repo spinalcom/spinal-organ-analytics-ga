@@ -1,6 +1,5 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.setControlEndpointValue = exports.getControlEndpointValue = exports.getEndpointValue = void 0;
 /**
  *
  * Function that takes in the node ID of an Endpoint node and return the current value of said Endpoint
