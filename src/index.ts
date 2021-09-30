@@ -159,62 +159,64 @@ class SpinalMain {
                     if(typeOfElement == analyticChildrenType){
                         // Récupération du controlpoint lié avec le nom de l'analytic
                         let controlBmsEndpoint = await this.getControlEndpoint(element.id.get(), analyticName); // sortie
-                        switch(analyticName){
-                            case "Energie globale":
-                                console.log("ok");
-                                break;
-                            case "Chauffage":
-                                console.log("ok");
-                                break;
-                            case "Climatisation":
-                                console.log("ok");
-                                break;
-                            case "Eclairage":
-                                console.log("ok");
-                                break;
-                            case "Eau":
-                                console.log("ok");
-                                break;
-                            case "Production d'énergie":
-                                console.log("ok");
-                                break;
-                            case "Ensoleillement":
-                                console.log("ok");
-                                break;
-                            case "Efficacité de production d'énergie solaire":
-                                console.log("ok");
-                                break;
-                            case "Gain en émission de CO2":
-                                console.log("ok");
-                                break;
-                            case "Taux d'autoconsommation énergétique":
-                                console.log("ok");
-                                break;
-                            case "Qualité de l'air":
-                                console.log("ok");
-                                break;
-                            case "Luminosité":
-                                console.log("ok");
-                                break;
-                            case "Temperature moyenne":
-                                console.log("ok");
-                                break;
-                            case "Nombre d'espaces occupés":
-                                console.log("ok");
-                                break;
-                            case "Taux d'occupation":
-                                console.log("ok");
-                                break;
-                            case "Nombre de tickets":
-                                console.log("ok");
-                                break;
-                            default:
-                                console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
-                                // console.log(analyticName);
-                                // console.log(typeOfElement);
-                                break;
-
+                        if(controlBmsEndpoint != false){
+                            switch(analyticName){
+                                case "Energie globale":
+                                    console.log("ok");
+                                    break;
+                                case "Chauffage":
+                                    console.log("ok");
+                                    break;
+                                case "Climatisation":
+                                    console.log("ok");
+                                    break;
+                                case "Eclairage":
+                                    console.log("ok");
+                                    break;
+                                case "Eau":
+                                    console.log("ok");
+                                    break;
+                                case "Production d'énergie":
+                                    console.log("ok");
+                                    break;
+                                case "Ensoleillement":
+                                    console.log("ok");
+                                    break;
+                                case "Efficacité de production d'énergie solaire":
+                                    console.log("ok");
+                                    break;
+                                case "Gain en émission de CO2":
+                                    console.log("ok");
+                                    break;
+                                case "Taux d'autoconsommation énergétique":
+                                    console.log("ok");
+                                    break;
+                                case "Qualité de l'air":
+                                    console.log("ok");
+                                    break;
+                                case "Luminosité":
+                                    console.log("ok");
+                                    break;
+                                case "Temperature moyenne":
+                                    console.log("ok");
+                                    break;
+                                case "Nombre d'espaces occupés":
+                                    console.log("ok");
+                                    break;
+                                case "Taux d'occupation":
+                                    console.log("ok");
+                                    break;
+                                case "Nombre de tickets":
+                                    console.log("ok");
+                                    break;
+                                default:
+                                    console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
+                                    // console.log(analyticName);
+                                    // console.log(typeOfElement);
+                                    break;
+                            }
                         }
+                        
                         // console.log(controlBmsEndpoint);
 
                     }
