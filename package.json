@@ -1,0 +1,27 @@
+{
+  "name": "spinal-organ-analytic",
+  "version": "1.0.0",
+  "description": "Organ whose purpose is to explore analytics, apply the correct algorithm and save the value in the correct control-endpoint",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rm -rf dist && tsc",
+    "start": "npm run build && node dist/index.js"
+  },
+  "keywords": [
+    "analytic"
+  ],
+  "author": "SERIR rayane",
+  "license": "ISC",
+  "dependencies": {
+    "spinal-core-connectorjs_type": "git+https://github.com/spinalcom/spinal-core-connectorjs_type.git",
+    "spinal-env-viewer-graph-service": "git+https://github.com/spinalcom/Spinal-Graph-Service.git",
+    "spinal-env-viewer-plugin-analytics-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-analytics-service.git",
+    "spinal-env-viewer-plugin-control-endpoint-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-control-endpoint-service.git",
+    "spinal-env-viewer-plugin-group-manager-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-group-manager-service.git",
+    "spinal-model-graph": "git+https://github.com/spinalcom/spinal-model-graph.git"
+  },
+  "devDependencies": {
+    "typescript": "^4.4.3"
+  }
+}
