@@ -28,13 +28,14 @@ import { SpinalContext, SpinalGraph, SpinalNode } from "spinal-model-graph";
 import config from "./config";
 import { SpinalGraphService } from "spinal-env-viewer-graph-service";
 import { spinalAnalyticService } from "spinal-env-viewer-plugin-analytics-service";
-
+import { InputDataEndpointDataType, NetworkService, InputDataEndpoint, InputDataEndpointType}  from "spinal-model-bmsnetwork"
+import { SpinalTimeSeries } from "spinal-model-timeseries"
 
 
 
 class SpinalMain {
     constructor() { }
-
+    
     /**
      * 
      * Initialize connection with the hub and load graph
@@ -53,26 +54,28 @@ class SpinalMain {
         });
     }
 
-
+    public NetworkService = new NetworkService()
 
     private async getAnalytics(){
         const contexts = await spinalAnalyticService.getContexts();
         for(const context of contexts){
             const contextId = context.id.get();
-
-            //console.log(contextId);
-            return SpinalGraphService.findInContext(contextId,contextId,(node: SpinalNode<any>) => {
-                if(node.getType().get() == spinalAnalyticService.nodeType){
-                    (<any>SpinalGraphService)._addNode(node)
-                    return true;
-                }
-                else return false;
-            })
-
+            if(context.type.get() == "AnalyticGroupContext"){
+                return SpinalGraphService.findInContext(contextId,contextId,(node: SpinalNode<any>) => {
+                    if(node.getType().get() == spinalAnalyticService.nodeType){
+                        (<any>SpinalGraphService)._addNode(node)
+                        return true;
+                    }
+                    else return false;
+                })
+            }
+            else return undefined
         }
     }
+
+
+
     public async getNumberTicket(nodeId: string){
-        const node = SpinalGraphService.getRealNode(nodeId);
         //console.log(node)
         const tickets = await SpinalGraphService.getChildren(nodeId,["SpinalSystemServiceTicketHasTicket"]);
         //console.log(tickets);
@@ -80,7 +83,6 @@ class SpinalMain {
     }
 
     public async getRoomTicketCount(nodeId:string){
-        const node = SpinalGraphService.getRealNode(nodeId);
         const equipments = await SpinalGraphService.getChildren(nodeId,["hasBimObject"]);
         let res = await this.getNumberTicket(nodeId);
         for (const equipment of equipments ){
@@ -91,7 +93,6 @@ class SpinalMain {
     }
 
     public async getFloorTicketCount(nodeId:string){
-        const node = SpinalGraphService.getRealNode(nodeId);
         const rooms= await SpinalGraphService.getChildren(nodeId,["hasGeographicRoom"]);
         let res = await this.getNumberTicket(nodeId);
         for (const room of rooms ){
@@ -101,13 +102,41 @@ class SpinalMain {
     }
 
     public async getBuildingTicketCount(nodeId:string){
-        const node = SpinalGraphService.getRealNode(nodeId);
         const floors= await SpinalGraphService.getChildren(nodeId,["hasGeographicFloor"]);
         let res = await this.getNumberTicket(nodeId);
         for (const floor of floors ){
             res += await this.getFloorTicketCount(floor.id.get());
         }
         return res;
+    }
+
+
+    public async calculateTicket(nodeId : string, nodeType : string, targetNode){
+        let count = 0;
+        //console.log(targetNode.element.load());
+        if(nodeType == "geographicBuilding") {
+            count = await this.getBuildingTicketCount(nodeId);
+        }
+        else if (nodeType == "geographicFloor"){
+            count = await this.getFloorTicketCount(nodeId);
+        }
+
+        console.log(count);
+        const input : InputDataEndpoint = {
+            id: "",
+            name: "",
+            path: "",
+            currentValue: count,
+            unit: "",
+            dataType: InputDataEndpointDataType.Integer,
+            type: InputDataEndpointType.Other,
+            nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
+
+        };
+
+        await this.NetworkService.updateEndpoint(targetNode,input);
+        console.log("ControlEndpoint Nombre de tickets updated");
+        
     }
     
     public async getEndpoints(nodeId:string, nameFilter:string){
@@ -124,21 +153,6 @@ class SpinalMain {
         }
         return undefined;
     }
-
-    // public async getControlEndpoint(nodeId: string, nameFilter:string)  {
-    //     const element_to_controlendpoint_relation = spinalControlPointService.ROOM_TO_CONTROL_GROUP // "hasControlPoints"
-    //     const node = SpinalGraphService.getRealNode(nodeId);
-    //     const ControlEndpointProfils = await SpinalGraphService.getChildren(nodeId,[element_to_controlendpoint_relation]);
-    //     for(const endpointProfil of ControlEndpointProfils){ // pour chaque profil de control endpoint
-    //         const controlEndpointsModels = await SpinalGraphService.getChildren(endpointProfil.id.get(),["hasBmsEndpoint"]);
-    //         const controlEndpoints = controlEndpointsModels.map(el => el.get());
-    //         for(const controlEndpoint of controlEndpoints){
-    //             if (controlEndpoint.name.get() == nameFilter) return controlEndpoint;
-    //         }
-
-    //     }
-    //     return undefined;
-    // }
 
     public async getControlEndpoint(nodeId:string, nameFilter:string){
         const NODE_TO_CONTROL_POINTS_RELATION = spinalControlPointService.ROOM_TO_CONTROL_GROUP // "hasControlPoints"
@@ -179,52 +193,53 @@ class SpinalMain {
                         if(controlBmsEndpoint != false){
                             switch(analyticName){
                                 case "Energie globale":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Chauffage":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Climatisation":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Eclairage":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Eau":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Production d'énergie":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Ensoleillement":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Efficacité de production d'énergie solaire":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Gain en émission de CO2":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Taux d'autoconsommation énergétique":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Qualité de l'air":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Luminosité":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Temperature moyenne":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Nombre d'espaces occupés":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Taux d'occupation":
-                                    console.log("ok");
+                                    //console.log("ok");
                                     break;
                                 case "Nombre de tickets":
-                                    console.log("ok");
+                                    //console.log("ok");
+                                    this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
                                     break;
                                 default:
                                     console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);

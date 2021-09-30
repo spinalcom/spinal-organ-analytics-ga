@@ -37,8 +37,11 @@ const spinal_env_viewer_plugin_control_endpoint_service_1 = require("spinal-env-
 const config_1 = require("./config");
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
 const spinal_env_viewer_plugin_analytics_service_1 = require("spinal-env-viewer-plugin-analytics-service");
+const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
 class SpinalMain {
-    constructor() { }
+    constructor() {
+        this.NetworkService = new spinal_model_bmsnetwork_1.NetworkService();
+    }
     /**
      *
      * Initialize connection with the hub and load graph
@@ -61,21 +64,23 @@ class SpinalMain {
             const contexts = yield spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.getContexts();
             for (const context of contexts) {
                 const contextId = context.id.get();
-                //console.log(contextId);
-                return spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(contextId, contextId, (node) => {
-                    if (node.getType().get() == spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.nodeType) {
-                        spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(node);
-                        return true;
-                    }
-                    else
-                        return false;
-                });
+                if (context.type.get() == "AnalyticGroupContext") {
+                    return spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(contextId, contextId, (node) => {
+                        if (node.getType().get() == spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.nodeType) {
+                            spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(node);
+                            return true;
+                        }
+                        else
+                            return false;
+                    });
+                }
+                else
+                    return undefined;
             }
         });
     }
     getNumberTicket(nodeId) {
         return __awaiter(this, void 0, void 0, function* () {
-            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
             //console.log(node)
             const tickets = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["SpinalSystemServiceTicketHasTicket"]);
             //console.log(tickets);
@@ -84,7 +89,6 @@ class SpinalMain {
     }
     getRoomTicketCount(nodeId) {
         return __awaiter(this, void 0, void 0, function* () {
-            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
             const equipments = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasBimObject"]);
             let res = yield this.getNumberTicket(nodeId);
             for (const equipment of equipments) {
@@ -95,7 +99,6 @@ class SpinalMain {
     }
     getFloorTicketCount(nodeId) {
         return __awaiter(this, void 0, void 0, function* () {
-            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
             const rooms = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasGeographicRoom"]);
             let res = yield this.getNumberTicket(nodeId);
             for (const room of rooms) {
@@ -106,13 +109,37 @@ class SpinalMain {
     }
     getBuildingTicketCount(nodeId) {
         return __awaiter(this, void 0, void 0, function* () {
-            const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
             const floors = yield spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasGeographicFloor"]);
             let res = yield this.getNumberTicket(nodeId);
             for (const floor of floors) {
                 res += yield this.getFloorTicketCount(floor.id.get());
             }
             return res;
+        });
+    }
+    calculateTicket(nodeId, nodeType, targetNode) {
+        return __awaiter(this, void 0, void 0, function* () {
+            let count = 0;
+            //console.log(targetNode.element.load());
+            if (nodeType == "geographicBuilding") {
+                count = yield this.getBuildingTicketCount(nodeId);
+            }
+            else if (nodeType == "geographicFloor") {
+                count = yield this.getFloorTicketCount(nodeId);
+            }
+            console.log(count);
+            const input = {
+                id: "",
+                name: "",
+                path: "",
+                currentValue: count,
+                unit: "",
+                dataType: spinal_model_bmsnetwork_1.InputDataEndpointDataType.Integer,
+                type: spinal_model_bmsnetwork_1.InputDataEndpointType.Other,
+                nodeTypeName: "BmsEndpoint" // should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
+            };
+            yield this.NetworkService.updateEndpoint(targetNode, input);
+            console.log("ControlEndpoint Nombre de tickets updated");
         });
     }
     getEndpoints(nodeId, nameFilter) {
@@ -131,19 +158,6 @@ class SpinalMain {
             return undefined;
         });
     }
-    // public async getControlEndpoint(nodeId: string, nameFilter:string)  {
-    //     const element_to_controlendpoint_relation = spinalControlPointService.ROOM_TO_CONTROL_GROUP // "hasControlPoints"
-    //     const node = SpinalGraphService.getRealNode(nodeId);
-    //     const ControlEndpointProfils = await SpinalGraphService.getChildren(nodeId,[element_to_controlendpoint_relation]);
-    //     for(const endpointProfil of ControlEndpointProfils){ // pour chaque profil de control endpoint
-    //         const controlEndpointsModels = await SpinalGraphService.getChildren(endpointProfil.id.get(),["hasBmsEndpoint"]);
-    //         const controlEndpoints = controlEndpointsModels.map(el => el.get());
-    //         for(const controlEndpoint of controlEndpoints){
-    //             if (controlEndpoint.name.get() == nameFilter) return controlEndpoint;
-    //         }
-    //     }
-    //     return undefined;
-    // }
     getControlEndpoint(nodeId, nameFilter) {
         return __awaiter(this, void 0, void 0, function* () {
             const NODE_TO_CONTROL_POINTS_RELATION = spinal_env_viewer_plugin_control_endpoint_service_1.spinalControlPointService.ROOM_TO_CONTROL_GROUP; // "hasControlPoints"
@@ -183,52 +197,53 @@ class SpinalMain {
                             if (controlBmsEndpoint != false) {
                                 switch (analyticName) {
                                     case "Energie globale":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Chauffage":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Climatisation":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Eclairage":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Eau":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Production d'énergie":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Ensoleillement":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Efficacité de production d'énergie solaire":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Gain en émission de CO2":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Taux d'autoconsommation énergétique":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Qualité de l'air":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Luminosité":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Temperature moyenne":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Nombre d'espaces occupés":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Taux d'occupation":
-                                        console.log("ok");
+                                        //console.log("ok");
                                         break;
                                     case "Nombre de tickets":
-                                        console.log("ok");
+                                        //console.log("ok");
+                                        this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
                                         break;
                                     default:
                                         console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
