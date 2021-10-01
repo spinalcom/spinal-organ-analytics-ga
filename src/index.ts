@@ -73,6 +73,28 @@ class SpinalMain {
         }
     }
 
+    private async getAnalyticsGroup(){
+        const context = SpinalGraphService.getContextWithType("AnalyticGroupContext");
+        let orderedAnalyticGroups = [];
+        if(context.length !=0 ){
+            const contextId = context[0].info.id.get();
+            let analyticGroups = await SpinalGraphService.findInContext(contextId, contextId, (elt: SpinalNode<any>) => {
+                if(elt.info.type.get() == "AnalyticGroup"){
+                    (<any>SpinalGraphService)._addNode(elt);
+                    return true;
+                }
+                else return false;
+            });
+            // classement Piece puis Etage puis Batiment
+            let bat = analyticGroups.filter(group => (group.name.get() == "Bâtiment" || group.name.get() == "Batiment" || group.name.get() == "Building"));
+            let flr = analyticGroups.filter(group => (group.name.get() == "Etage" || group.name.get() == "Etages"));
+            let rom = analyticGroups.filter(group => (group.name.get() == "Pièces" || group.name.get() == "Pièce" || group.name.get() == "Pieces" || group.name.get() == "Piece"));
+            
+            orderedAnalyticGroups = rom.concat(flr, bat);
+            return orderedAnalyticGroups;
+        }
+    }
+
 
     public async sumTimeSeriesOfBmsEndpoints(bmsEndpoints: any) {
         const networkService = new NetworkService();
@@ -87,7 +109,9 @@ class SpinalMain {
             let spinalTs = await timeSeriesNode.getElement();
             let currentData = await spinalTs.getCurrent();
             // console.log("current data : " + currentData.value);
-            sum += currentData.value;
+            if(currentData != undefined){
+                sum += currentData.value;
+            }
             // let testValue = await networkService.getData(bms.id.get());
             // console.log(testValue);
         }
@@ -145,7 +169,6 @@ class SpinalMain {
             }
         }
         return outputBmsEndpoint;
-
     }
 
     public async calculateTicket(nodeId : string, nodeType : string, targetNode){
@@ -177,7 +200,7 @@ class SpinalMain {
 
     public async calculateAnalyticsGlobalEnergy(targetNode:any, elementId: string, typeOfElement: string) {
         let endpointList = [];
-        let valueToPush = 0;
+        let valueToPush = undefined;
         if (typeOfElement == "geographicBuilding") {
             let filter = "Comptage Energie Active Total";
             endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
@@ -194,22 +217,12 @@ class SpinalMain {
             console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
         }
 
-        const input : InputDataEndpoint = {
-            id: "",
-            name: "",
-            path: "",
-            currentValue: valueToPush,
-            unit: "",
-            dataType: InputDataEndpointDataType.Real,
-            type: InputDataEndpointType.Other,
-            nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
-        };
-        await this.NetworkService.updateEndpoint(targetNode,input);
+        return valueToPush;
     }
 
     public async calculateAnalyticsGlobalCVC(targetNode:any, elementId: string, typeOfElement: string) {
         let endpointList = [];
-        let valueToPush = 0;
+        let valueToPush = undefined;
         if (typeOfElement == "geographicBuilding") {
             let filter = "CVC";
             endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
@@ -229,57 +242,160 @@ class SpinalMain {
             console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
         }
 
-        const input : InputDataEndpoint = {
-            id: "",
-            name: "",
-            path: "",
-            currentValue: valueToPush,
-            unit: "",
-            dataType: InputDataEndpointDataType.Real,
-            type: InputDataEndpointType.Other,
-            nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
-        };
-        await this.NetworkService.updateEndpoint(targetNode,input);
+        return valueToPush;
     }
 
     public async calculateAnalyticsGlobalLighting(targetNode:any, elementId: string, typeOfElement: string) {
         let endpointList = [];
-        let valueToPush = 0;
+        let valueToPush = undefined;
         if (typeOfElement == "geographicBuilding") {
-
+            // il faut récupérer la conso de chaque étage depuis leur control point respectifs : une fonction spécifique pour Vinci a été créée
+            valueToPush = await this.VINCI_specificUpdate_Lighting_Building_Analytics("Eclairage");
         }
         else if (typeOfElement == "geographicFloor") {
             let filter = "Comptage Energie - Eclairage";
             endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
             let bmsEndpoints = await this.filterBmsEndpoint(endpointList, filter);
             valueToPush = await this.sumTimeSeriesOfBmsEndpoints(bmsEndpoints);
-            // console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
         }
         else {
             console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
         }
+        return valueToPush;
+    }
 
-        const input : InputDataEndpoint = {
-            id: "",
-            name: "",
-            path: "",
-            currentValue: valueToPush,
-            unit: "",
-            dataType: InputDataEndpointDataType.Real,
-            type: InputDataEndpointType.Other,
-            nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
-        };
-        await this.NetworkService.updateEndpoint(targetNode,input);
+    //////////////////////////////////////////////////////////
+    ////////////////// PRODUCTION ENERGIE ANALYTICS //////////
+    //////////////////////////////////////////////////////////
+
+    public async calculateAnalyticsEnergyProduction(targetNode:any, elementId: string, typeOfElement: string){
+        let allBmsEndpoints = [];
+        let valueToPush = undefined;
+        let filters = ["Photovoltaique", "Geothermie", "TD Velo"];
+        let endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+        for (let filter of filters){
+            let bms = await this.filterBmsEndpoint(endpointList, filter)
+            allBmsEndpoints = allBmsEndpoints.concat(bms);
+        }
+        valueToPush = await this.sumTimeSeriesOfBmsEndpoints(allBmsEndpoints);
+        return valueToPush;
+    }
+
+    public async calculateAnalyticsSunlightProduction(targetNode:any, elementId: string, typeOfElement: string){
+        let valueToPush = undefined;
+        let filter = "Photovoltaique";
+        let endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+        let bms = await this.filterBmsEndpoint(endpointList, filter);
+        valueToPush = await this.sumTimeSeriesOfBmsEndpoints(bms);
+        return valueToPush;
     }
 
 
+
+/////////////////////////////////////////////////////////////////////////
+/////////////////// SPECIFIC FUNCTIONS FOR VINCI ////////////////////////
+/////////////////////////////////////////////////////////////////////////
+
+    public async VINCI_specificUpdate_CVC_Floors_CP_Analytics(targetNode:any, elementId: string, typeOfElement: string, analyticName:string = "Climatisation"){
+        // principe : on calcule l'analytics pour l etage -2, on le divise par 3 et on push dans -2 -1 et 0 (RDC)
+        let analyticsResult = (await this.calculateAnalyticsGlobalCVC(targetNode, elementId, typeOfElement)) / 3 ;
+        // push dans -2
+        await this.updateControlEndpointWithAnalytic(targetNode, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+        // on récupère les bons control point de -1 et 0 et on push dedans
+        let spatialContext = (SpinalGraphService.getContextWithType("geographicContext"))[0];
+        let spatialId = spatialContext.info.id.get();
+        let floors = await SpinalGraphService.findInContext(spatialId, spatialId, (elt:SpinalNode<any>) => {
+            if(elt.info.type.get() == "geographicFloor" && (elt.info.name.get() == "-1" || elt.info.name.get() == "0")){
+                (<any>SpinalGraphService)._addNode(elt);
+                return true;
+            }
+            return false;
+        });
+        for(let flr of floors){
+            let controlBmsEndpoint = await this.getControlEndpoint(flr.id.get(), analyticName);
+            if(controlBmsEndpoint != false){
+                await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+            }
+            else{
+                console.log("Impossible to update control point " + analyticName + " of floor : " + flr.name.get());
+            }
+        }
+    }
+
+    public async VINCI_specificUpdate_Lighting_Floors_CP_Analytics(targetNode:any, elementId: string, typeOfElement: string, analyticName:string = "Eclairage"){
+        // principe : on calcule l'analytics pour l etage -2, on le divise par 3 et on push dans -2 -1 et 0 (RDC)
+        let analyticsResult = (await this.calculateAnalyticsGlobalCVC(targetNode, elementId, typeOfElement)) / 3 ;
+        // push dans -2
+        await this.updateControlEndpointWithAnalytic(targetNode, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+        // on récupère les bons control point de -1 et 0 et on push dedans
+        let spatialContext = (SpinalGraphService.getContextWithType("geographicContext"))[0];
+        let spatialId = spatialContext.info.id.get();
+        let floors = await SpinalGraphService.findInContext(spatialId, spatialId, (elt:SpinalNode<any>) => {
+            if(elt.info.type.get() == "geographicFloor" && (elt.info.name.get() == "-1" || elt.info.name.get() == "0")){
+                (<any>SpinalGraphService)._addNode(elt);
+                return true;
+            }
+            return false;
+        });
+        for(let flr of floors){
+            let controlBmsEndpoint = await this.getControlEndpoint(flr.id.get(), analyticName);
+            if(controlBmsEndpoint != false){
+                await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+            }
+            else{
+                console.log("Impossible to update control point " + analyticName + " of floor : " + flr.name.get());
+            }
+        }
+    }
+
+    public async VINCI_specificUpdate_Lighting_Building_Analytics(analyticName:string = "Eclairage"){
+        // principe : il faut récupérer la conso de l eclairage de chaque étage depuis leur control point respectifs
+        let valueToPush = undefined;
+        let allBmsToSum = [];
+        const spatialContext = (SpinalGraphService.getContextWithType("geographicContext"))[0];
+        const spatialId = spatialContext.info.id.get();
+        const floors = await SpinalGraphService.findInContext(spatialId, spatialId, (elt:SpinalNode<any>) => {
+            if(elt.info.type.get() == "geographicFloor"){
+                (<any>SpinalGraphService)._addNode(elt);
+                return true;
+            }
+            return false;
+        });
+        for(const flr of floors){
+            let bmsEndpoints = await this.getControlEndpoint(flr.id.get(), analyticName);
+            allBmsToSum = allBmsToSum.concat(bmsEndpoints);
+        }
+        valueToPush = await this.sumTimeSeriesOfBmsEndpoints(allBmsToSum);
+        return valueToPush;
+
+
+        // sumTimeSeriesOfBmsEndpoints
+    }
 
     
 //////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////
 
 
+    public async updateControlEndpointWithAnalytic(target:any, valueToPush:any, dataType:any, type:any){
 
+        if(valueToPush != undefined){
+            const input : InputDataEndpoint = {
+                id: "",
+                name: "",
+                path: "",
+                currentValue: valueToPush,
+                unit: "",
+                dataType: dataType,
+                type: type,
+                nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
+            };
+            await this.NetworkService.updateEndpoint(target,input);
+        }
+        else{
+            console.log(valueToPush + " value to push in node : " + target.name.get() + " -- ABORTED !");
+        }
+    }
 
     public async getEndpoints(nodeId: string, nameFilter: string) {
         const element_to_endpoint_relation = "hasEndPoint";
@@ -291,7 +407,6 @@ class SpinalMain {
             for (const endpoint of endpoints) {
                 if (endpoint.name.get() == nameFilter) return endpoint.id.get() // !!!! A CHANGER !!!!!
             }
-
         }
         return undefined;
     }
@@ -310,101 +425,118 @@ class SpinalMain {
 
     // Update control points with correct values
     public async updateControlEndpoints() {
-        const analytics = await this.getAnalytics();
-        for (const analytic of analytics) {
+        // const analytics = await this.getAnalytics();
+        const analyticGroups = await this.getAnalyticsGroup();
+        
+        for(const analyticGroup of analyticGroups){
+            const analytics = await SpinalGraphService.getChildren(analyticGroup.id.get(), ["groupHasAnalytic"]);
+            for (const analytic of analytics) {
 
-            // récupération du nom de l'analytic et du type d'analytic ciblé
-            let analyticChildrenType = analytic.childrenType.get();
-            let analyticName = analytic.name.get();
+                // récupération du nom de l'analytic et du type d'analytic ciblé
+                let analyticChildrenType = analytic.childrenType.get();
+                let analyticName = analytic.name.get();
+    
+                const node = SpinalGraphService.getRealNode(analytic.id.get());
+    
+                const groups = await SpinalGraphService.getChildren(analytic.id.get(), [spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
+                for (const group of groups) {
+                    const elements = await SpinalGraphService.getChildren(group.id.get()); // récupération du gorupe auquel est lié l'analytic
+                    for (const element of elements) {
+                        // récupération des noeuds du bon type
+                        const typeOfElement = element.type.get();
+                        if (typeOfElement == analyticChildrenType) {
+                            // Récupération du controlpoint lié avec le nom de l'analytic
+                            let controlBmsEndpoint = await this.getControlEndpoint(element.id.get(), analyticName); // sortie
+                            if (controlBmsEndpoint != false) {
+                                let analyticsResult = undefined;
+                                switch (analyticName) {
+                                    case "Energie globale":
+                                        analyticsResult =  await this.calculateAnalyticsGlobalEnergy(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Chauffage":
+                                        // console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Climatisation": // DEV SPECIFIQUE VINCI : LES BOUCLES IF ET ELSE IF pour etage -2 -1 et 0
+                                        if(typeOfElement == "geographicFloor" && element.name.get() == "-2"){
+                                            console.log(analyticName + " specific function is used for " + typeOfElement + " : " + element.name.get());
+                                            await this.VINCI_specificUpdate_CVC_Floors_CP_Analytics(controlBmsEndpoint, element.id.get(), typeOfElement, analyticName);
+    
+                                        }
+                                        else if(typeOfElement == "geographicFloor" && (element.name.get() == "-1" || element.name.get() == "0")){
+                                            console.log(analyticName + " specific function is used for " + typeOfElement + " : " + element.name.get());
+                                        }
+                                        else{ // DEV NORMAL DANS CE ELSE
+                                            analyticsResult = await this.calculateAnalyticsGlobalCVC(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                            await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                            console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        }
+                                        break;
+                                    case "Eclairage": // DEV SPECIFIQUE VINCI : LES BOUCLES IF ET ELSE IF pour etage -2 -1 et 0 + pour Building dans la fonction calculateAnalyticsGlobalLighting
+                                        if(typeOfElement == "geographicFloor" && element.name.get() == "-2"){
+                                            console.log(analyticName + " specific function is used for " + typeOfElement + " : " + element.name.get());
+                                            await this.VINCI_specificUpdate_Lighting_Floors_CP_Analytics(controlBmsEndpoint, element.id.get(), typeOfElement, analyticName);
 
-            const node = SpinalGraphService.getRealNode(analytic.id.get());
-            /*const contextId = this.getNodeContext(analytic.id.get());
-            console.log(analytic.childrenType.get());
-            const nodesToUpdate = await this.getAnalyticChildren(contextId,analytic.id.get(),analytic.childrenType.get());
-            console.log(nodesToUpdate);*/
-
-            const groups = await SpinalGraphService.getChildren(analytic.id.get(), [spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
-            for (const group of groups) {
-                const elements = await SpinalGraphService.getChildren(group.id.get()); // récupération du gorupe auquel est lié l'analytic
-                for (const element of elements) {
-                    // récupération des noeuds du bon type
-                    const typeOfElement = element.type.get();
-                    if (typeOfElement == analyticChildrenType) {
-                        // Récupération du controlpoint lié avec le nom de l'analytic
-                        let controlBmsEndpoint = await this.getControlEndpoint(element.id.get(), analyticName); // sortie
-                        if (controlBmsEndpoint != false) {
-                            let analyticsResult = undefined;
-                            switch (analyticName) {
-                                case "Energie globale":
-                                    await this.calculateAnalyticsGlobalEnergy(controlBmsEndpoint, element.id.get(), typeOfElement);
-                                    console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    break;
-                                case "Chauffage":
-                                    // console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    break;
-                                case "Climatisation":
-                                    await this.calculateAnalyticsGlobalCVC(controlBmsEndpoint, element.id.get(), typeOfElement);
-                                    console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    break;
-                                case "Eclairage":
-                                    await this.calculateAnalyticsGlobalLighting(controlBmsEndpoint, element.id.get(), typeOfElement);
-                                    console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    break;
-                                case "Eau":
-                                    // console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    break;
-                                case "Production d'énergie":
-                                    break;
-                                case "Ensoleillement":
-                                    break;
-                                case "Efficacité de production d'énergie solaire":
-                                    break;
-                                case "Gain en émission de CO2":
-                                    break;
-                                case "Taux d'autoconsommation énergétique":
-                                    break;
-                                case "Qualité de l'air":
-                                    break;
-                                case "Luminosité":
-                                    break;
-                                case "Temperature moyenne":
-                                    break;
-                                case "Nombre d'espaces occupés":
-                                    break;
-                                case "Taux d'occupation":
-                                    break;
-                                case "Nombre de tickets":
-                                    await this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
-                                    console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    break;
-                                default:
-                                    console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
-                                    // console.log(analyticName);
-                                    // console.log(typeOfElement);
-                                    break;
+                                        }
+                                        else if(typeOfElement == "geographicFloor" && (element.name.get() == "-1" || element.name.get() == "0")){
+                                            console.log(analyticName + " specific function is used for " + typeOfElement + " : " + element.name.get());
+                                        }
+                                        else{ // DEV NORMAL DANS CE ELSE
+                                            analyticsResult = await this.calculateAnalyticsGlobalLighting(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                            await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                            console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        }
+                                        break;
+                                    case "Eau":
+                                        // console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Production d'énergie":
+                                        analyticsResult =  await this.calculateAnalyticsEnergyProduction(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Ensoleillement":
+                                        analyticsResult =  await this.calculateAnalyticsSunlightProduction(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Efficacité de production d'énergie solaire":
+                                        break;
+                                    case "Gain en émission de CO2":
+                                        break;
+                                    case "Taux d'autoconsommation énergétique":
+                                        break;
+                                    case "Qualité de l'air":
+                                        break;
+                                    case "Luminosité":
+                                        break;
+                                    case "Temperature moyenne":
+                                        break;
+                                    case "Nombre d'espaces occupés":
+                                        break;
+                                    case "Taux d'occupation":
+                                        break;
+                                    case "Nombre de tickets":
+                                        await this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    default:
+                                        console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
+                                        break;
+                                }
                             }
                         }
-
-                        // console.log(controlBmsEndpoint);
-
                     }
-
-
-
-                    // console.log(element);
                 }
+    
+    
             }
-
-
         }
-
-
     }
-
 }
 
 async function Main() {
-    // const networkService = new NetworkService();
     const spinalMain = new SpinalMain();
     await spinalMain.init();
     console.log(NetworkService);
