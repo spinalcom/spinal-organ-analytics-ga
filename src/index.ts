@@ -24,7 +24,7 @@
 
 import { spinalCore } from "spinal-core-connectorjs_type";
 import { spinalControlPointService } from "spinal-env-viewer-plugin-control-endpoint-service";
-import { SpinalContext, SpinalGraph, SpinalNode } from "spinal-model-graph";
+import { SpinalContext, SpinalGraph, SpinalNode, SPINAL_RELATION_LST_PTR_TYPE, SPINAL_RELATION_PTR_LST_TYPE } from "spinal-model-graph";
 import config from "./config";
 import { SpinalGraphService } from "spinal-env-viewer-graph-service";
 import { spinalAnalyticService } from "spinal-env-viewer-plugin-analytics-service";
@@ -98,24 +98,19 @@ class SpinalMain {
 
     public async sumTimeSeriesOfBmsEndpoints(bmsEndpoints: any) {
         const networkService = new NetworkService();
-        // console.log(bmsEndpoints);
         let sum = 0;
         for (let bms of bmsEndpoints) {
-            // console.log(bms);
             let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
-            // console.log(timeSeriesModel);
-            let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-            // console.log(timeSeriesNode);
-            let spinalTs = await timeSeriesNode.getElement();
-            let currentData = await spinalTs.getCurrent();
-            // console.log("current data : " + currentData.value);
-            if(currentData != undefined){
-                sum += currentData.value;
+            if(timeSeriesModel.length !=0){
+                let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
+                let spinalTs = await timeSeriesNode.getElement();
+                let currentData = await spinalTs.getCurrent();
+                if(currentData != undefined){
+                    sum += currentData.value;
+                }
             }
-            // let testValue = await networkService.getData(bms.id.get());
-            // console.log(testValue);
+            
         }
-        // console.log(sum);
         return sum;
     }
 
@@ -291,6 +286,82 @@ class SpinalMain {
     }
 
 
+    //////////////////////////////////////////////////////////
+    /////////////////// COMMISSIONNING ANALYTICS /////////////
+    //////////////////////////////////////////////////////////
+
+    public async calculateAnalyticsMonitorable(targetNode:any, elementId: string, typeOfElement: string){
+        let filter = "MULTICAPTEUR";
+        let bimObjects = await SpinalGraphService.getChildren(elementId, ["hasBimObject"]);
+        let multicapteurs = bimObjects.filter(elt => elt.name.get().includes(filter));
+        if(multicapteurs.length ==0){
+            return "Non monitorable";
+            // console.log("pas de MCA");
+            // monitorable0++;
+        }
+        else{
+            for(let mca of multicapteurs){
+                let bmsEndpoints = await SpinalGraphService.getChildren(mca.id.get(), ["hasBmsEndpoint"]);
+                if(bmsEndpoints.length == 0){
+                    return "Monitorable mais non monitorée";
+                    // monitorable1++;
+                    // console.log("MCA mais pas de endpoint");
+                }
+                else{
+                    return "Monitorée";
+                    // monitorable2++;
+                    // console.log("MCA et endpoint : monitorable");
+                }
+            }
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////
+    ///////////////////////// GTB ANALYTICS //////////////////////////
+    //////////////////////////////////////////////////////////////////
+
+    public async calculateAnalyticsOccupationRate(targetNode:any, elementId: string, typeOfElement: string){
+        const networkService = new NetworkService();
+        let analyticResults = [];
+        let rate = 0;
+
+        let lastHourDate = new Date();
+        lastHourDate.setHours(lastHourDate.getHours() - 1);
+
+        const OBJECT_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
+        const filterOccupationBmsEndpoint = "Occupation";
+        let filterMonitorable = "Monitorable";
+        let filterMulticapteur = "MULTICAPTEUR";
+        let spatialId = (SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+        let monitorableControlEndpoint = await this.getControlEndpoint(elementId, filterMonitorable);
+        if(monitorableControlEndpoint != false){
+            let currentDataMonitorable = (await networkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
+            if(currentDataMonitorable == "Monitorée"){
+                console.log("monitorée");
+                let multicapteur = await SpinalGraphService.findInContext(elementId, spatialId, elt => {
+                    if(elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, SPINAL_RELATION_PTR_LST_TYPE)){
+                        (<any>SpinalGraphService)._addNode(elt);
+                        return true;
+                    }
+                    return false;
+                });
+                let allBmsEndpoints = await this.filterBmsEndpoint(multicapteur, filterOccupationBmsEndpoint);
+                for(let bms of allBmsEndpoints){
+                    let spinalTs = await networkService.getTimeseries(bms.id.get());
+                    let dataFromLastHour = await spinalTs.getFromIntervalTime(lastHourDate);
+                    for(let i = 0 ; i < dataFromLastHour.length ; i++){
+                        analyticResults[i] =  analyticResults[i] | dataFromLastHour[i].value;
+                    }
+                }
+            }
+            for(let res of analyticResults){
+                rate += (res/(analyticResults.length));
+            }
+        }
+        return Math.round(rate*100);
+    }
+
+
 
 /////////////////////////////////////////////////////////////////////////
 /////////////////// SPECIFIC FUNCTIONS FOR VINCI ////////////////////////
@@ -416,6 +487,7 @@ class SpinalMain {
         const CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
         let allControlPoints = await SpinalGraphService.getChildren(nodeId, [NODE_TO_CONTROL_POINTS_RELATION]);
         for (let controlPoint of allControlPoints) {
+            // console.log(controlPoint);
             let allBmsEndpoints = await SpinalGraphService.getChildren(controlPoint.id.get(), [CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION]);
             let test = allBmsEndpoints.filter(elt => elt.name.get() == nameFilter);
             if (test.length != 0) return test[0];
@@ -516,9 +588,17 @@ class SpinalMain {
                                     case "Nombre d'espaces occupés":
                                         break;
                                     case "Taux d'occupation":
+                                        analyticsResult = await this.calculateAnalyticsOccupationRate(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                        console.log(analyticsResult);
                                         break;
                                     case "Nombre de tickets":
                                         await this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Monitorable":
+                                        analyticsResult = await this.calculateAnalyticsMonitorable(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Enumerated, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + typeOfElement + " updated !!!");
                                         break;
                                     default:

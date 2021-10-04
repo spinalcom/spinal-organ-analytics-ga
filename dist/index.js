@@ -25,6 +25,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const spinal_core_connectorjs_type_1 = require("spinal-core-connectorjs_type");
 const spinal_env_viewer_plugin_control_endpoint_service_1 = require("spinal-env-viewer-plugin-control-endpoint-service");
+const spinal_model_graph_1 = require("spinal-model-graph");
 const config_1 = require("./config");
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
 const spinal_env_viewer_plugin_analytics_service_1 = require("spinal-env-viewer-plugin-analytics-service");
@@ -92,24 +93,18 @@ class SpinalMain {
     }
     async sumTimeSeriesOfBmsEndpoints(bmsEndpoints) {
         const networkService = new spinal_model_bmsnetwork_1.NetworkService();
-        // console.log(bmsEndpoints);
         let sum = 0;
         for (let bms of bmsEndpoints) {
-            // console.log(bms);
             let timeSeriesModel = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
-            // console.log(timeSeriesModel);
-            let timeSeriesNode = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-            // console.log(timeSeriesNode);
-            let spinalTs = await timeSeriesNode.getElement();
-            let currentData = await spinalTs.getCurrent();
-            // console.log("current data : " + currentData.value);
-            if (currentData != undefined) {
-                sum += currentData.value;
+            if (timeSeriesModel.length != 0) {
+                let timeSeriesNode = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
+                let spinalTs = await timeSeriesNode.getElement();
+                let currentData = await spinalTs.getCurrent();
+                if (currentData != undefined) {
+                    sum += currentData.value;
+                }
             }
-            // let testValue = await networkService.getData(bms.id.get());
-            // console.log(testValue);
         }
-        // console.log(sum);
         return sum;
     }
     ////////////////////////////////////////////////////
@@ -265,6 +260,75 @@ class SpinalMain {
         valueToPush = await this.sumTimeSeriesOfBmsEndpoints(bms);
         return valueToPush;
     }
+    //////////////////////////////////////////////////////////
+    /////////////////// COMMISSIONNING ANALYTICS /////////////
+    //////////////////////////////////////////////////////////
+    async calculateAnalyticsMonitorable(targetNode, elementId, typeOfElement) {
+        let filter = "MULTICAPTEUR";
+        let bimObjects = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasBimObject"]);
+        let multicapteurs = bimObjects.filter(elt => elt.name.get().includes(filter));
+        if (multicapteurs.length == 0) {
+            return "Non monitorable";
+            // console.log("pas de MCA");
+            // monitorable0++;
+        }
+        else {
+            for (let mca of multicapteurs) {
+                let bmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(mca.id.get(), ["hasBmsEndpoint"]);
+                if (bmsEndpoints.length == 0) {
+                    return "Monitorable mais non monitorée";
+                    // monitorable1++;
+                    // console.log("MCA mais pas de endpoint");
+                }
+                else {
+                    return "Monitorée";
+                    // monitorable2++;
+                    // console.log("MCA et endpoint : monitorable");
+                }
+            }
+        }
+    }
+    //////////////////////////////////////////////////////////////////
+    ///////////////////////// GTB ANALYTICS //////////////////////////
+    //////////////////////////////////////////////////////////////////
+    async calculateAnalyticsOccupationRate(targetNode, elementId, typeOfElement) {
+        const networkService = new spinal_model_bmsnetwork_1.NetworkService();
+        let analyticResults = [];
+        let rate = 0;
+        let lastHourDate = new Date();
+        lastHourDate.setHours(lastHourDate.getHours() - 1);
+        const OBJECT_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
+        const filterOccupationBmsEndpoint = "Occupation";
+        let filterMonitorable = "Monitorable";
+        let filterMulticapteur = "MULTICAPTEUR";
+        let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+        let monitorableControlEndpoint = await this.getControlEndpoint(elementId, filterMonitorable);
+        if (monitorableControlEndpoint != false) {
+            let currentDataMonitorable = (await networkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
+            if (currentDataMonitorable == "Monitorée") {
+                console.log("monitorée");
+                let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
+                    if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
+                        spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
+                        return true;
+                    }
+                    return false;
+                });
+                let allBmsEndpoints = await this.filterBmsEndpoint(multicapteur, filterOccupationBmsEndpoint);
+                for (let bms of allBmsEndpoints) {
+                    let spinalTs = await networkService.getTimeseries(bms.id.get());
+                    let dataFromLastHour = await spinalTs.getFromIntervalTime(lastHourDate);
+                    for (let i = 0; i < dataFromLastHour.length; i++) {
+                        analyticResults[i] = analyticResults[i] | dataFromLastHour[i].value;
+                    }
+                }
+            }
+            for (let res of analyticResults) {
+                rate += (res / (analyticResults.length));
+            }
+        }
+        return Math.round(rate * 100);
+    }
     /////////////////////////////////////////////////////////////////////////
     /////////////////// SPECIFIC FUNCTIONS FOR VINCI ////////////////////////
     /////////////////////////////////////////////////////////////////////////
@@ -378,6 +442,7 @@ class SpinalMain {
         const CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
         let allControlPoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, [NODE_TO_CONTROL_POINTS_RELATION]);
         for (let controlPoint of allControlPoints) {
+            // console.log(controlPoint);
             let allBmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(controlPoint.id.get(), [CONTROL_POINTS_TO_BMS_ENDPOINT_RELATION]);
             let test = allBmsEndpoints.filter(elt => elt.name.get() == nameFilter);
             if (test.length != 0)
@@ -472,9 +537,17 @@ class SpinalMain {
                                     case "Nombre d'espaces occupés":
                                         break;
                                     case "Taux d'occupation":
+                                        analyticsResult = await this.calculateAnalyticsOccupationRate(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticsResult);
                                         break;
                                     case "Nombre de tickets":
                                         await this.calculateTicket(element.id.get(), typeOfElement, controlBmsEndpoint);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        break;
+                                    case "Monitorable":
+                                        analyticsResult = await this.calculateAnalyticsMonitorable(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                        await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Enumerated, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + typeOfElement + " updated !!!");
                                         break;
                                     default:
