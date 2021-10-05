@@ -28,7 +28,7 @@ export default {
     hubHost: "92.222.24.29",
     hubPort: 10150,
     digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission",
-    interval: 30000
+    interval: 1800000
 };
 
 // export default {

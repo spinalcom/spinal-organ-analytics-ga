@@ -38,3 +38,21 @@ export function getControlEndpointValue(controlEndpointId: string) : any {
 export function setControlEndpointValue(controlEndpointId :string, value: any) : void {
     
 }
+
+
+/*private async getAnalytics() {
+        const contexts = await spinalAnalyticService.getContexts();
+        for (const context of contexts) {
+            const contextId = context.id.get();
+            if(context.type.get() == "AnalyticGroupContext"){
+                return SpinalGraphService.findInContext(contextId,contextId,(node: SpinalNode<any>) => {
+                    if(node.getType().get() == spinalAnalyticService.nodeType){
+                        (<any>SpinalGraphService)._addNode(node)
+                        return true;
+                    }
+                    else return false;
+                })
+            }
+            else return undefined
+        }
+    }*/

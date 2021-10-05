@@ -30,9 +30,12 @@ const config_1 = require("./config");
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
 const spinal_env_viewer_plugin_analytics_service_1 = require("spinal-env-viewer-plugin-analytics-service");
 const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
+const spinal_model_timeseries_1 = require("spinal-model-timeseries");
 class SpinalMain {
     constructor() {
+        //// INIT SERVICES /////
         this.NetworkService = new spinal_model_bmsnetwork_1.NetworkService();
+        this.SpinalServiceTimeserie = new spinal_model_timeseries_1.SpinalServiceTimeseries();
     }
     /**
      *
@@ -50,24 +53,6 @@ class SpinalMain {
                 reject();
             });
         });
-    }
-    async getAnalytics() {
-        const contexts = await spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.getContexts();
-        for (const context of contexts) {
-            const contextId = context.id.get();
-            if (context.type.get() == "AnalyticGroupContext") {
-                return spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(contextId, contextId, (node) => {
-                    if (node.getType().get() == spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.nodeType) {
-                        spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(node);
-                        return true;
-                    }
-                    else
-                        return false;
-                });
-            }
-            else
-                return undefined;
-        }
     }
     async getAnalyticsGroup() {
         const context = spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("AnalyticGroupContext");
@@ -91,7 +76,6 @@ class SpinalMain {
         }
     }
     async sumTimeSeriesOfBmsEndpoints(bmsEndpoints) {
-        const networkService = new spinal_model_bmsnetwork_1.NetworkService();
         let sum = 0;
         for (let bms of bmsEndpoints) {
             let timeSeriesModel = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
@@ -355,7 +339,6 @@ class SpinalMain {
     ///////////////////////// GTB ANALYTICS //////////////////////////
     //////////////////////////////////////////////////////////////////
     async calculateAnalyticsOccupationRate(targetNode, elementId, typeOfElement) {
-        const networkService = new spinal_model_bmsnetwork_1.NetworkService();
         let analyticResults = [];
         let rate = 0;
         let lastHourDate = new Date();
@@ -367,9 +350,8 @@ class SpinalMain {
         let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
         let monitorableControlEndpoint = await this.getControlEndpoint(elementId, filterMonitorable);
         if (monitorableControlEndpoint != false) {
-            let currentDataMonitorable = (await networkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
+            let currentDataMonitorable = (await this.NetworkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
             if (currentDataMonitorable == "Monitorée") {
-                console.log("monitorée");
                 let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
                     if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
                         spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
@@ -379,7 +361,7 @@ class SpinalMain {
                 });
                 let allBmsEndpoints = await this.filterBmsEndpoint(multicapteur, filterOccupationBmsEndpoint);
                 for (let bms of allBmsEndpoints) {
-                    let spinalTs = await networkService.getTimeseries(bms.id.get());
+                    let spinalTs = await this.NetworkService.getTimeseries(bms.id.get());
                     let dataFromLastHour = await spinalTs.getFromIntervalTime(lastHourDate);
                     for (let i = 0; i < dataFromLastHour.length; i++) {
                         analyticResults[i] = analyticResults[i] | dataFromLastHour[i].value;
@@ -391,6 +373,106 @@ class SpinalMain {
             }
         }
         return Math.round(rate * 100);
+    }
+    async calculateAnalyticsAirQuality(targetId, elementId, typeOfElement) {
+        let value = 0;
+        const dateInter = this.SpinalServiceTimeserie.getDateFromLastHours(1);
+        const OBJECT_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
+        const filterCO2BmsEndpoint = "CO2";
+        let filterMonitorable = "Monitorable";
+        let filterMulticapteur = "MULTICAPTEUR";
+        let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+        let monitorableControlEndpoint = await this.getControlEndpoint(elementId, filterMonitorable);
+        if (monitorableControlEndpoint != false) {
+            let currentDataMonitorable = (await this.NetworkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
+            if (currentDataMonitorable == "Monitorée") {
+                let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
+                    if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
+                        spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
+                        return true;
+                    }
+                    return false;
+                });
+                let allBmsEndpoints = await this.filterBmsEndpoint(multicapteur, filterCO2BmsEndpoint);
+                let length = allBmsEndpoints.length;
+                for (let bms of allBmsEndpoints) {
+                    let val = await this.SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
+                    if (!(val > 0) || val > 5000 || val == 0) {
+                        length--;
+                        continue;
+                    }
+                    value += await this.SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
+                }
+                if (length != 0)
+                    value = value / length;
+            }
+        }
+        return value;
+    }
+    async calculateAnalyticsTemperature(targetId, elementId, typeOfElement) {
+        let value = 0;
+        const dateInter = this.SpinalServiceTimeserie.getDateFromLastHours(1);
+        const OBJECT_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
+        const filterTempBmsEndpoint = "Temp";
+        let filterMonitorable = "Monitorable";
+        let filterMulticapteur = "MULTICAPTEUR";
+        let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+        let monitorableControlEndpoint = await this.getControlEndpoint(elementId, filterMonitorable);
+        if (monitorableControlEndpoint != false) {
+            let currentDataMonitorable = (await this.NetworkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
+            if (currentDataMonitorable == "Monitorée") {
+                let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
+                    if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
+                        spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
+                        return true;
+                    }
+                    return false;
+                });
+                let allBmsEndpoints = await this.filterBmsEndpoint(multicapteur, filterTempBmsEndpoint);
+                let length = allBmsEndpoints.length;
+                for (let bms of allBmsEndpoints) {
+                    const valMin = await this.SpinalServiceTimeserie.getMin(bms.id.get(), dateInter);
+                    if (valMin < -20) {
+                        length--;
+                        continue;
+                    }
+                    value += await this.SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
+                }
+                if (length != 0)
+                    value = value / length;
+            }
+        }
+        return value;
+    }
+    async calculateAnalyticsLuminosity(targetId, elementId, typeOfElement) {
+        let value = 0;
+        const dateInter = this.SpinalServiceTimeserie.getDateFromLastHours(1);
+        const OBJECT_TO_BMS_ENDPOINT_RELATION = "hasBmsEndpoint";
+        const filterLumBmsEndpoint = "Lum";
+        let filterMonitorable = "Monitorable";
+        let filterMulticapteur = "MULTICAPTEUR";
+        let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+        let monitorableControlEndpoint = await this.getControlEndpoint(elementId, filterMonitorable);
+        if (monitorableControlEndpoint != false) {
+            let currentDataMonitorable = (await this.NetworkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
+            if (currentDataMonitorable == "Monitorée") {
+                let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
+                    if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
+                        spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
+                        return true;
+                    }
+                    return false;
+                });
+                let allBmsEndpoints = await this.filterBmsEndpoint(multicapteur, filterLumBmsEndpoint);
+                let length = allBmsEndpoints.length;
+                for (let bms of allBmsEndpoints) {
+                    value += await this.SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
+                }
+                if (length != 0)
+                    value = value / length;
+            }
+        }
+        return value;
     }
     /////////////////////////////////////////////////////////////////////////
     /////////////////// SPECIFIC FUNCTIONS FOR VINCI ////////////////////////
@@ -422,7 +504,7 @@ class SpinalMain {
     }
     async VINCI_specificUpdate_Lighting_Floors_CP_Analytics(targetNode, elementId, typeOfElement, analyticName = "Eclairage") {
         // principe : on calcule l'analytics pour l etage -2, on le divise par 3 et on push dans -2 -1 et 0 (RDC)
-        let analyticsResult = (await this.calculateAnalyticsGlobalCVC(targetNode, elementId, typeOfElement)) / 3;
+        let analyticsResult = (await this.calculateAnalyticsGlobalLighting(targetNode, elementId, typeOfElement)) / 3;
         // push dans -2
         await this.updateControlEndpointWithAnalytic(targetNode, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
         // on récupère les bons control point de -1 et 0 et on push dedans
@@ -438,6 +520,7 @@ class SpinalMain {
         for (let flr of floors) {
             let controlBmsEndpoint = await this.getControlEndpoint(flr.id.get(), analyticName);
             if (controlBmsEndpoint != false) {
+                //console.log(analyticsResult);
                 await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
             }
             else {
@@ -486,6 +569,7 @@ class SpinalMain {
             console.log(valueToPush + " value to push in node : " + target.name.get() + " -- ABORTED !");
         }
     }
+    //return endpoints that has the exact same name as nameFilter
     async getEndpoints(nodeId, nameFilter) {
         const element_to_endpoint_relation = "hasEndPoint";
         const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
@@ -518,14 +602,15 @@ class SpinalMain {
         // const analytics = await this.getAnalytics();
         const analyticGroups = await this.getAnalyticsGroup();
         const ticketStepIds = await this.ticketsOuvertsFilter();
+        console.log("Ticket Filter Set !");
         for (const analyticGroup of analyticGroups) {
             const analytics = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analyticGroup.id.get(), ["groupHasAnalytic"]);
             for (const analytic of analytics) {
                 // récupération du nom de l'analytic et du type d'analytic ciblé
                 let analyticChildrenType = analytic.childrenType.get();
                 let analyticName = analytic.name.get();
-                //if(analyticName == "Monitorable") continue;
-                const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(analytic.id.get());
+                if (analyticName == "Monitorable")
+                    continue;
                 const groups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analytic.id.get(), [spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
                     const elements = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic
@@ -596,17 +681,32 @@ class SpinalMain {
                                     case "Taux d'autoconsommation énergétique":
                                         break;
                                     case "Qualité de l'air":
+                                        if (typeOfElement == "geographicRoom") {
+                                            analyticsResult = await this.calculateAnalyticsAirQuality(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                            await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                            console.log(analyticName + " for " + typeOfElement + " updated ");
+                                        }
                                         break;
                                     case "Luminosité":
+                                        if (typeOfElement == "geographicRoom") {
+                                            analyticsResult = await this.calculateAnalyticsLuminosity(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                            await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                            console.log(analyticName + " for " + typeOfElement + " updated ");
+                                        }
                                         break;
                                     case "Temperature moyenne":
+                                        if (typeOfElement == "geographicRoom") {
+                                            analyticsResult = await this.calculateAnalyticsTemperature(controlBmsEndpoint, element.id.get(), typeOfElement);
+                                            await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                            console.log(analyticName + " for " + typeOfElement + " updated ");
+                                        }
                                         break;
                                     case "Nombre d'espaces occupés":
                                         break;
                                     case "Taux d'occupation":
                                         analyticsResult = await this.calculateAnalyticsOccupationRate(controlBmsEndpoint, element.id.get(), typeOfElement);
                                         await this.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticsResult);
+                                        //console.log(analyticsResult);
                                         break;
                                     case "Nombre de tickets":
                                         await this.updateTicketControlPoints(element.id.get(), typeOfElement, controlBmsEndpoint, ticketStepIds);
@@ -627,6 +727,7 @@ class SpinalMain {
                 }
             }
         }
+        console.log("DONE");
     }
 }
 async function Main() {
@@ -635,8 +736,10 @@ async function Main() {
     //console.log(NetworkService);
     //console.log(SpinalTimeSeries);
     ///// TODO ////
-    await spinalMain.updateControlEndpoints();
-    console.log("DONE");
+    spinalMain.updateControlEndpoints();
+    setInterval(() => {
+        spinalMain.updateControlEndpoints();
+    }, config_1.default.interval);
 }
 // Call main function
 Main();
