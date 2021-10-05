@@ -12,19 +12,19 @@ const utils_1 = require("../utils");
 // WHEN Time series are ready, add : 
 // 6- integral based algorithm
 function cpy(endpointId, controlEndpointId) {
-    (0, utils_1.setControlEndpointValue)(controlEndpointId, (0, utils_1.getEndpointValue)(endpointId));
+    utils_1.setControlEndpointValue(controlEndpointId, utils_1.getEndpointValue(endpointId));
 }
 function avg(endpointIds) {
     let sum = 0;
     for (const endpointId of endpointIds) {
-        sum += (0, utils_1.getEndpointValue)(endpointId);
+        sum += utils_1.getEndpointValue(endpointId);
     }
     return sum / endpointIds.length;
 }
 function or(endpointIds) {
     let res = false;
     for (const endpointId of endpointIds) {
-        res = (0, utils_1.getEndpointValue)(endpointId);
+        res = utils_1.getEndpointValue(endpointId);
         if (res)
             return res;
     }
@@ -33,10 +33,10 @@ function or(endpointIds) {
 function xor(endpointIds) {
     let res = false;
     for (const endpointId of endpointIds) {
-        if (res && (0, utils_1.getEndpointValue)(endpointId))
+        if (res && utils_1.getEndpointValue(endpointId))
             return false;
         if (!res)
-            res = (0, utils_1.getEndpointValue)(endpointId);
+            res = utils_1.getEndpointValue(endpointId);
     }
     return res;
 }
