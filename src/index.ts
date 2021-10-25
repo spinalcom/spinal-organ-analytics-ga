@@ -487,7 +487,7 @@ class SpinalMain {
                     const loaded = await controlEndpoint.element.load();
                     let val = loaded.get().currentValue;
                     if(val>0){
-                        console.log("floor ",val);
+                        //console.log("floor ",val);
                         res =  res + val;
                         count += 1;
                     }
