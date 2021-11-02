@@ -1,49 +1,25 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-/**
- *
- * Function that takes in the node ID of an Endpoint node and return the current value of said Endpoint
- * @export
- * @param {string} endpointId
- * @return {*}  {*}
- */
-function getEndpointValue(endpointId) {
-}
-exports.getEndpointValue = getEndpointValue;
-/**
- *
- * Function that takes in the node ID of a ControlEndpoint node and return the current value of said ControlEndpoint
- * @export
- * @param {string} controlEndpointId
- * @return {*}  {*}
- */
-function getControlEndpointValue(controlEndpointId) {
-}
-exports.getControlEndpointValue = getControlEndpointValue;
-/**
- *
- *
- * @export
- * @param {string} controlEndpointId
- * @param {*} value
- */
-function setControlEndpointValue(controlEndpointId, value) {
-}
-exports.setControlEndpointValue = setControlEndpointValue;
-/*private async getAnalytics() {
-        const contexts = await spinalAnalyticService.getContexts();
-        for (const context of contexts) {
-            const contextId = context.id.get();
-            if(context.type.get() == "AnalyticGroupContext"){
-                return SpinalGraphService.findInContext(contextId,contextId,(node: SpinalNode<any>) => {
-                    if(node.getType().get() == spinalAnalyticService.nodeType){
-                        (<any>SpinalGraphService)._addNode(node)
-                        return true;
-                    }
-                    else return false;
-                })
+/*
+import { SpinalGraphService} from "spinal-env-viewer-graph-service";
+
+
+
+export async function getAnalyticsGroup() {
+    const context = SpinalGraphService.getContextWithType("AnalyticGroupContext");
+    let orderedAnalyticGroups = [];
+    if(context.length !=0 ){
+        const contextId = context[0].info.id.get();
+        let analyticGroups = await SpinalGraphService.findInContext(contextId, contextId, (elt: SpinalNode<any>) => {
+            if(elt.info.type.get() == "AnalyticGroup"){
+                (<any>SpinalGraphService)._addNode(elt);
+                return true;
             }
-            else return undefined
-        }
-    }*/ 
+            else return false;
+        });
+        // classement Piece puis Etage puis Batiment
+        let bat = analyticGroups.filter(group => (group.name.get() == "Bâtiment" || group.name.get() == "Batiment" || group.name.get() == "Building"));
+        let flr = analyticGroups.filter(group => (group.name.get() == "Etage" || group.name.get() == "Etages"));
+        let rom = analyticGroups.filter(group => (group.name.get() == "Pièces" || group.name.get() == "Pièce" || group.name.get() == "Pieces" || group.name.get() == "Piece"));
+        orderedAnalyticGroups = rom.concat(flr, bat);
+        return orderedAnalyticGroups;
+} */ 
 //# sourceMappingURL=utils.js.map
