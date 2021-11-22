@@ -230,6 +230,11 @@ export async function calculateAnalyticsFromChildren(elementId : string, typeOfE
         return res/count;
     }
 }
+// Rajouter la même fonction sans la division ( juste somme pour consommation eau globale par exemple )
+
+
+
+
 
 /**
  *

@@ -229,6 +229,7 @@ export async function calculateAnalyticsMonitorable(elementId: string){
         // monitorable0++;
     }
     else{
+
         for(let m of monitors){
             let bmsEndpoints = await SpinalGraphService.getChildren(m.id.get(), ["hasBmsEndpoint"]);
             if(bmsEndpoints.length > 0){
