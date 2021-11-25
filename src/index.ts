@@ -240,9 +240,9 @@ async function Main() {
     await spinalMain.init();
     ///// TODO ////
     spinalMain.updateControlEndpoints();
-    /*setInterval(() => {
+    setInterval(() => {
         spinalMain.updateControlEndpoints();
-    },config.interval)*/
+    },config.interval)
 
 
 
