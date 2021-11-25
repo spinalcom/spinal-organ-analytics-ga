@@ -87,6 +87,7 @@ class SpinalMain {
                                 switch (analyticName) {
                                     case "Energie globale":
                                         analyticsResult =  await globalAnalytics.calculateAnalyticsGlobalEnergy(element.id.get(), typeOfElement);
+                                        analyticsResult = Math.round(analyticsResult*1000)/1000;
                                         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + typeOfElement + " updated ");
                                         break;
@@ -107,6 +108,7 @@ class SpinalMain {
                                         }
                                         else{ // DEV NORMAL DANS CE ELSE
                                             analyticsResult = await globalAnalytics.calculateAnalyticsGlobalCVC(element.id.get(), typeOfElement);
+                                            analyticsResult = Math.round(analyticsResult*1000)/1000;
                                             await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                             console.log(analyticName + " for " + typeOfElement + " updated");
                                         }
@@ -122,22 +124,26 @@ class SpinalMain {
                                         }
                                         else{ // DEV NORMAL DANS CE ELSE
                                             analyticsResult = await globalAnalytics.calculateAnalyticsGlobalLighting(element.id.get(), typeOfElement);
+                                            analyticsResult = Math.round(analyticsResult*1000)/1000;
                                             await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                             console.log(analyticName + " for " + typeOfElement + " updated ");
                                         }
                                         break;
                                     case "Eau":
                                         analyticsResult = await globalAnalytics.calculateAnalyticsGlobalWater(element.id.get(), typeOfElement);
+                                        analyticsResult = Math.round(analyticsResult*1000)/1000;
                                         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + typeOfElement + " updated ");
                                         break;
                                     case "Production d'énergie":
                                         analyticsResult =  await prodAnalytics.calculateAnalyticsEnergyProduction( element.id.get());
+                                        analyticsResult = Math.round(analyticsResult*1000)/1000;
                                         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + typeOfElement + " updated ");
                                         break;
                                     case "Ensoleillement":
                                         analyticsResult =  await prodAnalytics.calculateAnalyticsSunlightProduction(element.id.get());
+                                        analyticsResult = Math.round(analyticsResult*1000)/1000;
                                         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + typeOfElement + " updated ");
                                         break;
@@ -232,13 +238,11 @@ class SpinalMain {
 async function Main() {
     const spinalMain = new SpinalMain();
     await spinalMain.init();
-    
-    //spinalMain.updateControlEndpoints();
     ///// TODO ////
-    spinalMain.updateControlEndpoints()
-    setInterval(() => {
+    spinalMain.updateControlEndpoints();
+    /*setInterval(() => {
         spinalMain.updateControlEndpoints();
-    },config.interval)
+    },config.interval)*/
 
 
 

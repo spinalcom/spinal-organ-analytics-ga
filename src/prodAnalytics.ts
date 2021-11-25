@@ -18,7 +18,7 @@ export async function calculateAnalyticsEnergyProduction(elementId: string){
         let bms = await utils.filterBmsEndpoint(endpointList, filter)
         allBmsEndpoints = allBmsEndpoints.concat(bms);
     }
-    valueToPush = await utils.sumTimeSeriesOfBmsEndpoints(allBmsEndpoints);
+    valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(allBmsEndpoints);
     return valueToPush;
 }
 
@@ -34,6 +34,6 @@ export async function calculateAnalyticsSunlightProduction(elementId: string){
     let filter = "Photovoltaique";
     let endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
     let bms = await utils.filterBmsEndpoint(endpointList, filter);
-    valueToPush = await utils.sumTimeSeriesOfBmsEndpoints(bms);
+    valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bms);
     return valueToPush;
 }

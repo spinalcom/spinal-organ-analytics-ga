@@ -103,7 +103,7 @@ export async function calculateAnalyticsGlobalWater(elementId: string, typeOfEle
     let endpointList = [];
     let valueToPush = undefined;
     if (typeOfElement == "geographicBuilding") {
-        valueToPush = await utils.calculateAnalyticsFromChildren(elementId,typeOfElement,"Eau");
+        valueToPush = await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Eau");
     }
     else if (typeOfElement == "geographicFloor") {
         let filter = "Volume EF";
@@ -159,6 +159,7 @@ export async function VINCI_specificUpdate_Lighting_Building_Analytics(analyticN
 export async function VINCI_specificUpdate_Lighting_Floors_CP_Analytics(targetNode:any, elementId: string, typeOfElement: string, analyticName:string = "Eclairage"){
     // principe : on calcule l'analytics pour l etage -2, on le divise par 3 et on push dans -2 -1 et 0 (RDC)
     let analyticsResult = (await calculateAnalyticsGlobalLighting(elementId, typeOfElement)) / 3 ;
+    analyticsResult = Math.round(analyticsResult*1000)/1000;
     // push dans -2
     await utils.updateControlEndpointWithAnalytic(targetNode, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
     // on récupère les bons control point de -1 et 0 et on push dedans
@@ -195,6 +196,7 @@ export async function VINCI_specificUpdate_Lighting_Floors_CP_Analytics(targetNo
 export async function VINCI_specificUpdate_CVC_Floors_CP_Analytics(targetNode:any, elementId: string, typeOfElement: string, analyticName:string = "Climatisation"){
     // principe : on calcule l'analytics pour l etage -2, on le divise par 3 et on push dans -2 -1 et 0 (RDC)
     let analyticsResult = (await calculateAnalyticsGlobalCVC(elementId, typeOfElement)) / 3 ;
+    analyticsResult = Math.round(analyticsResult*1000)/1000;
     // push dans -2
     await utils.updateControlEndpointWithAnalytic(targetNode, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
     // on récupère les bons control point de -1 et 0 et on push dedans
@@ -223,7 +225,7 @@ export async function calculateAnalyticsGlobalHeat(elementId: string, typeOfElem
     let endpointList = [];
     let valueToPush = undefined;
     if (typeOfElement == "geographicBuilding") {
-        valueToPush = await utils.calculateAnalyticsFromChildren(elementId,typeOfElement,"Chauffage");
+        valueToPush = await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Chauffage");
     }
     else if (typeOfElement == "geographicFloor") {
         let filter = "BECS";

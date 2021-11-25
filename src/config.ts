@@ -25,17 +25,20 @@
 export default {
     userId: 168,
     userPassword: "b4v4SsE2",
-    hubHost: "92.222.24.29",
+    hubHost: "localhost",
     hubPort: 10150,
     digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission",
     interval: 3600000
 };
 
-// export default {
-//     userId: 168,
-//     userPassword: "mdp_1",
-//     hubHost: "localhost",
-//     hubPort: 8010,
-//     digitalTwinPath: "/__users__/admin/town_hall_demo/Digital twin",
-//     interval: 30000
-// };
+
+
+/*
+export default {
+    userId: 168,
+    userPassword: "b4v4SsE2",
+    hubHost: "92.222.24.29",
+    hubPort: 10150,
+    digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission",
+    interval: 3600000
+};*/

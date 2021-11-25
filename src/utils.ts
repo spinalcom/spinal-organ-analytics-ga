@@ -177,7 +177,7 @@ export async function filterBmsEndpoint(endpointList: any, filter: string) {
  * @param {string} elementId - Id of the object node we want to calculate analytic value of
  * @param {("geographicFloor" | "geographicBuilding")} typeOfElement - Type of the object node, either building or floor
  * @param {string} controlEndpointName - Name of the control endpoint used
- * @return {*} 
+ * @return {*} - Result is the average of all child nodes values contributing to the calculation
  */
 export async function calculateAnalyticsFromChildren(elementId : string, typeOfElement : "geographicFloor" | "geographicBuilding",controlEndpointName : string){
     if(typeOfElement == "geographicFloor"){
@@ -231,6 +231,58 @@ export async function calculateAnalyticsFromChildren(elementId : string, typeOfE
     }
 }
 // Rajouter la même fonction sans la division ( juste somme pour consommation eau globale par exemple )
+
+export async function calculateAnalyticsFromChildrenNoAverage(elementId : string, typeOfElement : "geographicFloor" | "geographicBuilding",controlEndpointName : string){
+    if(typeOfElement == "geographicFloor"){
+        // on récupère les rooms dans l'étage
+        const rooms = await SpinalGraphService.getChildren(elementId,["hasGeographicRoom"]);
+        // Pour chaque room
+        let res= 0;
+        let count = 0;
+        for(const room of rooms) {
+            const monitorable = await getControlEndpoint(room.id.get(),"Monitorable")
+            if (monitorable != false){
+                const valueMonitorable = await monitorable.element.load();
+                // Si la room est monitorée
+                if (valueMonitorable.get().currentValue == "Monitorée"){
+                    // On récupère le controlEndpoint
+                    const controlEndpoint = await getControlEndpoint(room.id.get(),controlEndpointName);
+                    if (controlEndpoint != false){
+                        const loaded = await controlEndpoint.element.load();
+                        let val = loaded.get().currentValue;
+                        if(val>0){
+                            res =  res + val;
+                            count += 1;
+                        }
+                        
+                    }
+                }
+            }
+        } // fin boucle sur les rooms
+        if(count == 0) return 0;
+        return res;
+
+    } else if(typeOfElement == "geographicBuilding") {
+        const floors = await SpinalGraphService.getChildren(elementId,["hasGeographicFloor"]);
+        let res= 0;
+        let count = 0;
+        for(const floor of floors) {
+            // On récupère le controlEndpoint
+            const controlEndpoint = await getControlEndpoint(floor.id.get(),controlEndpointName);
+            if (controlEndpoint != false){
+                const loaded = await controlEndpoint.element.load();
+                let val = loaded.get().currentValue;
+                if(val>0){
+                    //console.log("floor ",val);
+                    res =  res + val;
+                    count += 1;
+                }
+            }
+        } // fin boucle sur les floors
+        if(count == 0) return 0;
+        return res;
+    }
+}
 
 
 
