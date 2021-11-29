@@ -32,7 +32,7 @@ export default {
 };
 
 
-
+// remote testing Batiment A vinci
 /*
 export default {
     userId: 168,
