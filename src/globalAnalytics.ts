@@ -15,17 +15,37 @@ import * as utils from "./utils"
 export async function calculateAnalyticsGlobalEnergy(elementId: string, typeOfElement: string) {
     let endpointList = [];
     let valueToPush = undefined;
+    let filter = "";
+    let bmsEndpoints =[];
+
+    let elementNode = SpinalGraphService.getRealNode(elementId);
+
     if (typeOfElement == "geographicBuilding") {
         let filter = "Comptage Energie Active Total";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+        endpointList = await utils.getBmsDevices(elementId);
         let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
         valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+
     }
     else if (typeOfElement == "geographicFloor") {
-        let filter = "Comptage Energie - General";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
-        let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+        switch(elementNode.info.name.get()){
+            case "0":
+                filter = "Comptage Energie - General - TD ES";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                //console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+            
+            default:
+                filter = "Comptage Energie - General - TD-B1";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                //console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+        }
+        
     }
     else {
         console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
@@ -44,20 +64,34 @@ export async function calculateAnalyticsGlobalEnergy(elementId: string, typeOfEl
 export async function calculateAnalyticsGlobalCVC(elementId: string, typeOfElement: string) {
     let endpointList = [];
     let valueToPush = undefined;
+    let filter = "";
+    let bmsEndpoints = [];
+    let elementNode = SpinalGraphService.getRealNode(elementId);
+
     if (typeOfElement == "geographicBuilding") {
-        let filter = "CVC";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
-        let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
-        // return sum;
-        // console.log(bmsEndpoints);
+        valueToPush = await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Climatisation");
+        console.log("valueToPush for CVC = ", valueToPush);
     }
     else if (typeOfElement == "geographicFloor") {
-        let filter = "Comptage Energie - CVC";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
-        let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
-        // console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
+        switch(elementNode.info.name.get()){
+            case "0":
+                filter = "Comptage Energie - CVC - TDSG-B1-00";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                //console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+
+            default:
+                filter = "Comptage Energie - CVC - TD-B1";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                //console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+
+        }
+        
     }
     else {
         console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
@@ -76,15 +110,32 @@ export async function calculateAnalyticsGlobalCVC(elementId: string, typeOfEleme
 export async function calculateAnalyticsGlobalLighting(elementId: string, typeOfElement: string) {
     let endpointList = [];
     let valueToPush = undefined;
+    let filter = "";
+    let bmsEndpoints = [];
+    let elementNode = SpinalGraphService.getRealNode(elementId);
+
     if (typeOfElement == "geographicBuilding") {
         // il faut récupérer la conso de chaque étage depuis leur control point respectifs : une fonction spécifique pour Vinci a été créée
-        valueToPush = await VINCI_specificUpdate_Lighting_Building_Analytics("Eclairage");
+        valueToPush = await await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Eclairage");
     }
     else if (typeOfElement == "geographicFloor") {
-        let filter = "Comptage Energie - Eclairage";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
-        let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+        switch(elementNode.info.name.get()){
+            case "0":
+                filter = "Comptage Energie - Eclairage - TDSG-B1-00";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+
+            default:
+                filter = "Comptage Energie - Eclairage - TD-B1";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+        }
     }
     else {
         console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
@@ -107,8 +158,9 @@ export async function calculateAnalyticsGlobalWater(elementId: string, typeOfEle
     }
     else if (typeOfElement == "geographicFloor") {
         let filter = "Volume EF";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+        endpointList = await utils.getBmsDevices(elementId);
         let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+        console.log(bmsEndpoints);
         valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
         
     }
@@ -229,8 +281,10 @@ export async function calculateAnalyticsGlobalHeat(elementId: string, typeOfElem
     }
     else if (typeOfElement == "geographicFloor") {
         let filter = "BECS";
-        endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+        endpointList = await utils.getBmsDevices(elementId);
+        //endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
         let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+        console.log(bmsEndpoints);
         valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
         
     }

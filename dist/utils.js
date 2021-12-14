@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.updateControlEndpointWithAnalytic = exports.calculateAnalyticsFromChildrenNoAverage = exports.calculateAnalyticsFromChildren = exports.filterBmsEndpoint = exports.getValueFromControlEndpoint = exports.getEndpoints = exports.getBmsDevices = exports.getControlEndpoint = exports.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour = exports.sumTimeSeriesOfBmsEndpoints = exports.getAnalyticsGroup = exports.networkService = void 0;
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
 const spinal_env_viewer_plugin_control_endpoint_service_1 = require("spinal-env-viewer-plugin-control-endpoint-service");
 const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
@@ -77,10 +78,10 @@ async function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints) {
             }
             value = x.value;
         }
-        //console.log("h-1 value:",valueLastHour, " | current value:",value);
+        console.log("h-1 value:", valueLastHour, " | current value:", value);
         sum += (value - valueLastHour);
     }
-    //console.log(" TOTAL DIFFERENCE : ", sum);
+    console.log(" TOTAL DIFFERENCE : ", sum);
     return sum;
 }
 exports.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour = sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour;
@@ -106,6 +107,24 @@ async function getControlEndpoint(nodeId, nameFilter) {
     return false;
 }
 exports.getControlEndpoint = getControlEndpoint;
+/**
+ *
+ * Function that returns all potential endpoints (parent of BmsDevice)
+ * @export
+ * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
+ * @param {string} nameFilter - Substring of the endpoints name used to capture them
+ * @return {*}
+ */
+async function getBmsDevices(nodeId) {
+    let result = [];
+    const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
+    const p1_nodes = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasEndPoint"]); // get BmsDevice
+    const p2_nodes = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasBmsDevice"]); // get BmsDevice
+    result = p1_nodes.concat(p2_nodes);
+    result = result.concat([node.info]);
+    return result;
+}
+exports.getBmsDevices = getBmsDevices;
 /**
  *
  * Function that returns all endpoints whose name contains the nameFilter
@@ -157,11 +176,22 @@ exports.getValueFromControlEndpoint = getValueFromControlEndpoint;
 async function filterBmsEndpoint(endpointList, filter) {
     let outputBmsEndpoint = [];
     for (const endpoint of endpointList) {
-        let bmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpoint"]);
-        for (const bms of bmsEndpoints) {
-            if (bms.name.get().includes(filter))
-                outputBmsEndpoint.push(bms);
-            // if(bms.name.get().includes(filter)) outputBmsEndpoint.push(bms.name.get());
+        let bmsEndpointGroups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpointGroup"]);
+        if (bmsEndpointGroups.length != 0) {
+            for (const group of bmsEndpointGroups) {
+                let bmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get(), ["hasBmsEndpoint"]);
+                for (const bms of bmsEndpoints) {
+                    if (bms.name.get().includes(filter))
+                        outputBmsEndpoint.push(bms);
+                }
+            }
+        }
+        else {
+            let bmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpoint"]);
+            for (const bms of bmsEndpoints) {
+                if (bms.name.get().includes(filter))
+                    outputBmsEndpoint.push(bms);
+            }
         }
     }
     return outputBmsEndpoint;
@@ -174,7 +204,7 @@ exports.filterBmsEndpoint = filterBmsEndpoint;
  * @param {string} elementId - Id of the object node we want to calculate analytic value of
  * @param {("geographicFloor" | "geographicBuilding")} typeOfElement - Type of the object node, either building or floor
  * @param {string} controlEndpointName - Name of the control endpoint used
- * @return {*}
+ * @return {*} - Result is the average of all child nodes values contributing to the calculation
  */
 async function calculateAnalyticsFromChildren(elementId, typeOfElement, controlEndpointName) {
     if (typeOfElement == "geographicFloor") {
@@ -229,6 +259,60 @@ async function calculateAnalyticsFromChildren(elementId, typeOfElement, controlE
     }
 }
 exports.calculateAnalyticsFromChildren = calculateAnalyticsFromChildren;
+// Rajouter la même fonction sans la division ( juste somme pour consommation eau globale par exemple )
+async function calculateAnalyticsFromChildrenNoAverage(elementId, typeOfElement, controlEndpointName) {
+    if (typeOfElement == "geographicFloor") {
+        // on récupère les rooms dans l'étage
+        const rooms = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasGeographicRoom"]);
+        // Pour chaque room
+        let res = 0;
+        let count = 0;
+        for (const room of rooms) {
+            const monitorable = await getControlEndpoint(room.id.get(), "Monitorable");
+            if (monitorable != false) {
+                const valueMonitorable = await monitorable.element.load();
+                // Si la room est monitorée
+                if (valueMonitorable.get().currentValue == "Monitorée") {
+                    // On récupère le controlEndpoint
+                    const controlEndpoint = await getControlEndpoint(room.id.get(), controlEndpointName);
+                    if (controlEndpoint != false) {
+                        const loaded = await controlEndpoint.element.load();
+                        let val = loaded.get().currentValue;
+                        if (val > 0) {
+                            res = res + val;
+                            count += 1;
+                        }
+                    }
+                }
+            }
+        } // fin boucle sur les rooms
+        if (count == 0)
+            return 0;
+        return res;
+    }
+    else if (typeOfElement == "geographicBuilding") {
+        const floors = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasGeographicFloor"]);
+        let res = 0;
+        let count = 0;
+        for (const floor of floors) {
+            // On récupère le controlEndpoint
+            const controlEndpoint = await getControlEndpoint(floor.id.get(), controlEndpointName);
+            if (controlEndpoint != false) {
+                const loaded = await controlEndpoint.element.load();
+                let val = loaded.get().currentValue;
+                if (val > 0) {
+                    //console.log("floor ",val);
+                    res = res + val;
+                    count += 1;
+                }
+            }
+        } // fin boucle sur les floors
+        if (count == 0)
+            return 0;
+        return res;
+    }
+}
+exports.calculateAnalyticsFromChildrenNoAverage = calculateAnalyticsFromChildrenNoAverage;
 /**
  *
  * Function that updates a control endpoint value

@@ -34,6 +34,15 @@ export declare function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEnd
 export declare function getControlEndpoint(nodeId: string, nameFilter: string): Promise<false | import("spinal-env-viewer-graph-service/declarations/GraphManagerService").SpinalNodeRef>;
 /**
  *
+ * Function that returns all potential endpoints (parent of BmsDevice)
+ * @export
+ * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
+ * @param {string} nameFilter - Substring of the endpoints name used to capture them
+ * @return {*}
+ */
+export declare function getBmsDevices(nodeId: string): Promise<any[]>;
+/**
+ *
  * Function that returns all endpoints whose name contains the nameFilter
  * @export
  * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
@@ -66,9 +75,10 @@ export declare function filterBmsEndpoint(endpointList: any, filter: string): Pr
  * @param {string} elementId - Id of the object node we want to calculate analytic value of
  * @param {("geographicFloor" | "geographicBuilding")} typeOfElement - Type of the object node, either building or floor
  * @param {string} controlEndpointName - Name of the control endpoint used
- * @return {*}
+ * @return {*} - Result is the average of all child nodes values contributing to the calculation
  */
 export declare function calculateAnalyticsFromChildren(elementId: string, typeOfElement: "geographicFloor" | "geographicBuilding", controlEndpointName: string): Promise<number>;
+export declare function calculateAnalyticsFromChildrenNoAverage(elementId: string, typeOfElement: "geographicFloor" | "geographicBuilding", controlEndpointName: string): Promise<number>;
 /**
  *
  * Function that updates a control endpoint value

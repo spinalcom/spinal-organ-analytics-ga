@@ -82,10 +82,10 @@ export async function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpo
             }
             value = x.value;
         }
-        //console.log("h-1 value:",valueLastHour, " | current value:",value);
+        console.log("h-1 value:",valueLastHour, " | current value:",value);
         sum += (value - valueLastHour);
     }
-    //console.log(" TOTAL DIFFERENCE : ", sum);
+    console.log(" TOTAL DIFFERENCE : ", sum);
     return sum;
 }
 
@@ -108,6 +108,25 @@ export async function getControlEndpoint(nodeId:string, nameFilter:string){
         if (test.length != 0) return test[0];
     }
     return false;
+}
+
+/**
+ *
+ * Function that returns all potential endpoints (parent of BmsDevice)
+ * @export
+ * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
+ * @param {string} nameFilter - Substring of the endpoints name used to capture them
+ * @return {*} 
+ */
+ export async function getBmsDevices(nodeId: string) {
+    let result = [];
+    const node = SpinalGraphService.getRealNode(nodeId);
+    const p1_nodes = await SpinalGraphService.getChildren(nodeId, ["hasEndPoint"]); // get BmsDevice
+    const p2_nodes = await SpinalGraphService.getChildren(nodeId, ["hasBmsDevice"]); // get BmsDevice
+    result = p1_nodes.concat(p2_nodes);
+    result = result.concat([node.info]);
+    return result;
+
 }
 
 /**
@@ -161,10 +180,20 @@ export async function getValueFromControlEndpoint (nodeId :string , controlEndpo
 export async function filterBmsEndpoint(endpointList: any, filter: string) {
     let outputBmsEndpoint = [];
     for (const endpoint of endpointList) {
-        let bmsEndpoints = await SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpoint"]);
-        for (const bms of bmsEndpoints) {
-            if (bms.name.get().includes(filter)) outputBmsEndpoint.push(bms);
-            // if(bms.name.get().includes(filter)) outputBmsEndpoint.push(bms.name.get());
+        let bmsEndpointGroups = await SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpointGroup"]);
+        if(bmsEndpointGroups.length !=0){
+            for(const group of bmsEndpointGroups){
+                let bmsEndpoints = await SpinalGraphService.getChildren(group.id.get(), ["hasBmsEndpoint"]);
+                for (const bms of bmsEndpoints) {
+                    if (bms.name.get().includes(filter)) outputBmsEndpoint.push(bms);
+                }
+            }  
+        }
+        else{
+            let bmsEndpoints = await SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpoint"]);
+            for (const bms of bmsEndpoints) {
+                if (bms.name.get().includes(filter)) outputBmsEndpoint.push(bms);
+            }
         }
     }
     return outputBmsEndpoint;

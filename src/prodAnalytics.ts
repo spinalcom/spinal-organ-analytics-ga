@@ -13,11 +13,12 @@ export async function calculateAnalyticsEnergyProduction(elementId: string){
     let allBmsEndpoints = [];
     let valueToPush = undefined;
     let filters = ["Photovoltaique", "Geothermie", "TD Velo"];
-    let endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+    let endpointList = await utils.getBmsDevices(elementId);
     for (let filter of filters){
         let bms = await utils.filterBmsEndpoint(endpointList, filter)
         allBmsEndpoints = allBmsEndpoints.concat(bms);
     }
+    //console.log(allBmsEndpoints);
     valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(allBmsEndpoints);
     return valueToPush;
 }
@@ -31,9 +32,11 @@ export async function calculateAnalyticsEnergyProduction(elementId: string){
  */
 export async function calculateAnalyticsSunlightProduction(elementId: string){
     let valueToPush = undefined;
-    let filter = "Photovoltaique";
-    let endpointList = await SpinalGraphService.getChildren(elementId, ["hasEndPoint"]);
+    let filter = "Ensoleillement";
+    let endpointList = await utils.getBmsDevices(elementId);
     let bms = await utils.filterBmsEndpoint(endpointList, filter);
+    console.log(bms);
+
     valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bms);
     return valueToPush;
 }

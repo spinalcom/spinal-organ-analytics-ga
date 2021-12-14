@@ -24,9 +24,9 @@
 
 export default {
     userId: 168,
-    userPassword: "b4v4SsE2",
+    userPassword: "gVG69c3Tv",
     hubHost: "localhost",
-    hubPort: 10150,
+    hubPort: 11000,
     digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission",
     interval: 3600000
 };

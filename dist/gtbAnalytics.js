@@ -1,5 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.calculateAnalyticsMonitorable = exports.calculateAnalyticsLuminosity = exports.calculateAnalyticsTemperature = exports.calculateAnalyticsAirQuality = exports.calculateAnalyticsOccupationRate = void 0;
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
 const spinal_model_timeseries_1 = require("spinal-model-timeseries");
 const spinal_model_graph_1 = require("spinal-model-graph");
