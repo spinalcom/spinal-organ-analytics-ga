@@ -75,7 +75,7 @@ class SpinalMain {
                 // récupération du nom de l'analytic et du type d'analytic ciblé
                 let analyticChildrenType = analytic.childrenType.get();
                 let analyticName = analytic.name.get();
-                // if(analyticName == "Monitorable") continue;
+                 if(analyticName == "Monitorable") continue;
                 const groups = await SpinalGraphService.getChildren(analytic.id.get(), [spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
                     const elements = await SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic
@@ -233,9 +233,9 @@ async function Main() {
     await spinalMain.init();
     ///// TODO ////
     spinalMain.updateControlEndpoints();
-    // setInterval(() => {
-    //     spinalMain.updateControlEndpoints();
-    // },config.interval)
+    setInterval(() => {
+        spinalMain.updateControlEndpoints();
+    },config.interval)
 
 
 

@@ -68,8 +68,6 @@ class SpinalMain {
                 let analyticName = analytic.name.get();
                 if (analyticName == "Monitorable")
                     continue;
-                if (analyticName == "Taux d'occupation")
-                    continue;
                 const groups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analytic.id.get(), [spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
                     const elements = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic
