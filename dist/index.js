@@ -27,25 +27,41 @@ const spinal_core_connectorjs_type_1 = require("spinal-core-connectorjs_type");
 const config_1 = require("./config");
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
 const spinal_env_viewer_plugin_analytics_service_1 = require("spinal-env-viewer-plugin-analytics-service");
+const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
 const utils = require("./utils");
 const ticket = require("./ticketAnalytics");
+const globalAnalytics = require("./globalAnalytics");
+const gtbAnalytics = require("./gtbAnalytics");
+const cron = require("node-cron");
 class SpinalMain {
-    constructor() { }
+    constructor() {
+        const url = `https://${config_1.default.userId}:${config_1.default.userPassword}@${config_1.default.hubHost}:${config_1.default.hubPort}/`;
+        this.connect = spinal_core_connectorjs_type_1.spinalCore.connect(url);
+    }
     /**
      *
      * Initialize connection with the hub and load graph
      * @return {*}
      * @memberof SpinalMain
      */
-    init() {
-        const url = `https://${config_1.default.userId}:${config_1.default.userPassword}@${config_1.default.hubHost}:${config_1.default.hubPort}/`;
-        return new Promise((resolve, reject) => {
-            spinal_core_connectorjs_type_1.spinalCore.load(spinal_core_connectorjs_type_1.spinalCore.connect(url), config_1.default.digitalTwinPath, async (graph) => {
-                await spinal_env_viewer_graph_service_1.SpinalGraphService.setGraph(graph);
-                resolve(graph);
-            }, () => {
-                reject();
-            });
+    // public init() {
+    //     const url = `https://${config.userId}:${config.userPassword}@${config.hubHost}:${config.hubPort}/`;
+    //     return new Promise((resolve, reject) => {
+    //         spinalCore.load(spinalCore.connect(url), config.digitalTwinPath, async (graph: any) => {
+    //             await SpinalGraphService.setGraph(graph);
+    //             resolve(graph)
+    //         }, () => {
+    //             reject()
+    //         })
+    //     });
+    // }
+    init(succes, error) {
+        spinal_core_connectorjs_type_1.spinalCore.load(this.connect, config_1.default.digitalTwinPath, async (graph) => {
+            console.log("I'm connected");
+            await spinal_env_viewer_graph_service_1.SpinalGraphService.setGraph(graph);
+            succes(graph);
+        }, () => {
+            error();
         });
     }
     /**
@@ -66,8 +82,8 @@ class SpinalMain {
                 // récupération du nom de l'analytic et du type d'analytic ciblé
                 let analyticChildrenType = analytic.childrenType.get();
                 let analyticName = analytic.name.get();
-                if (analyticName == "Monitorable")
-                    continue;
+                //  if(analyticName == "Monitorable") continue;
+                //  if(analyticName == "Nombre de tickets") continue;
                 const groups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analytic.id.get(), [spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
                     const elements = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic
@@ -83,14 +99,13 @@ class SpinalMain {
                                     // case "Energie globale":
                                     //     analyticsResult =  await globalAnalytics.calculateAnalyticsGlobalEnergy(element.id.get(), typeOfElement);
                                     //     analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                    //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                    //     // await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                     //     console.log(analyticName + " for " + typeOfElement + " updated ");
                                     //     break;
                                     // case "Chauffage":
                                     //     analyticsResult =  await globalAnalytics.calculateAnalyticsGlobalHeat(element.id.get(),typeOfElement);
                                     //     analyticsResult = Math.round(analyticsResult*1000)/1000;
                                     //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //     console.log(analyticsResult);
                                     //     console.log(analyticName + " for " + typeOfElement + " updated");
                                     //     break;
                                     // case "Climatisation":
@@ -102,15 +117,21 @@ class SpinalMain {
                                     // case "Eclairage":
                                     //     analyticsResult = await globalAnalytics.calculateAnalyticsGlobalLighting(element.id.get(), typeOfElement);
                                     //     analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                    //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                    //     // await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                     //     console.log(analyticName + " for " + typeOfElement + " updated ");
                                     //     break;
-                                    // case "Eau":
-                                    //     analyticsResult = await globalAnalytics.calculateAnalyticsGlobalWater(element.id.get(), typeOfElement);
-                                    //     analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                    //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //     console.log(analyticName + " for " + typeOfElement + " updated ");
-                                    //     break;
+                                    case "Eau sanitaire":
+                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalWaterToilet(element.id.get(), typeOfElement);
+                                        analyticsResult = (Math.round(analyticsResult * 1000) / 1000) * 1000; //Transformer le m3 en Litres
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + typeOfElement + " updated ");
+                                        break;
+                                    case "Eau globale":
+                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalWater(element.id.get(), typeOfElement);
+                                        analyticsResult = (Math.round(analyticsResult * 1000) / 1000) * 1000; //Transformer le m3 en Litres
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + typeOfElement + " updated ");
+                                        break;
                                     // case "Production d'énergie":
                                     //     analyticsResult =  await prodAnalytics.calculateAnalyticsEnergyProduction( element.id.get());
                                     //     analyticsResult = Math.round(analyticsResult*1000)/1000;
@@ -176,12 +197,12 @@ class SpinalMain {
                                     // case "Taux d'occupation":
                                     //     if(typeOfElement == "geographicRoom"){
                                     //         analyticsResult = await gtbAnalytics.calculateAnalyticsOccupationRate(element.id.get());
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                    //         // await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                     //         console.log(analyticName + " for " + typeOfElement + " updated ");
                                     //     }
                                     //     else {
                                     //         analyticsResult = await utils.calculateAnalyticsFromChildren(element.id.get(), typeOfElement,"Taux d'occupation");
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                    //         // await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                     //         console.log(analyticName + " for " + typeOfElement + " updated ");
                                     //     }
                                     //     break;
@@ -189,14 +210,17 @@ class SpinalMain {
                                         await ticket.updateTicketControlPoints(element.id.get(), typeOfElement, controlBmsEndpoint, ticketStepIds);
                                         console.log(analyticName + " for " + typeOfElement + " updated ");
                                         break;
-                                    // case "Monitorable":
-                                    //     analyticsResult = await gtbAnalytics.calculateAnalyticsMonitorable(element.id.get());
-                                    //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Enumerated, InputDataEndpointType.Other);                                      
-                                    //     console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                    //     if(analyticsResult == "Monitorée") iMon1++;
-                                    //     else if(analyticsResult == "Monitorable mais non monitorée") iMon2++;
-                                    //     else if(analyticsResult == "Non monitorable") iMon3++;
-                                    //     break;
+                                    case "Monitorable":
+                                        analyticsResult = await gtbAnalytics.calculateAnalyticsMonitorable(element.id.get());
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Enumerated, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
+                                        if (analyticsResult == "Monitorée")
+                                            iMon1++;
+                                        else if (analyticsResult == "Monitorable mais non monitorée")
+                                            iMon2++;
+                                        else if (analyticsResult == "Non monitorable")
+                                            iMon3++;
+                                        break;
                                     default:
                                         console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
                                         break;
@@ -214,13 +238,26 @@ class SpinalMain {
     }
 }
 async function Main() {
-    const spinalMain = new SpinalMain();
-    await spinalMain.init();
-    ///// TODO ////
-    spinalMain.updateControlEndpoints();
-    // setInterval(() => {
-    //     spinalMain.updateControlEndpoints();
-    // },config.interval)
+    // start every 1h+10min
+    cron.schedule('10 * * * *', async () => {
+        console.log('Organ Start');
+        const spinalMain = new SpinalMain();
+        spinalMain.init(x => {
+            spinalMain.updateControlEndpoints();
+        }, y => {
+            setTimeout(() => {
+                console.log('STOP');
+                process.exit(0);
+            }, 5000);
+        });
+    });
+    // const spinalMain = new SpinalMain();
+    // await spinalMain.init();
+    // ///// TODO ////
+    // spinalMain.updateControlEndpoints();
+    // // setInterval(() => {
+    // //     spinalMain.updateControlEndpoints();
+    // // },config.interval)
 }
 // Call main function
 Main();

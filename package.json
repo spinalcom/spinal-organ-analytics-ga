@@ -14,16 +14,19 @@
   "author": "SERIR rayane",
   "license": "ISC",
   "dependencies": {
+    "node-cron": "^3.0.0",
     "spinal-core-connectorjs_type": "git+https://github.com/spinalcom/spinal-core-connectorjs_type.git",
     "spinal-env-viewer-graph-service": "git+https://github.com/spinalcom/Spinal-Graph-Service.git",
     "spinal-env-viewer-plugin-analytics-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-analytics-service.git",
     "spinal-env-viewer-plugin-control-endpoint-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-control-endpoint-service.git",
     "spinal-env-viewer-plugin-group-manager-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-group-manager-service.git",
-    "spinal-model-graph": "git+https://github.com/spinalcom/spinal-model-graph.git",
     "spinal-model-bmsnetwork": "git+https://github.com/spinalcom/spinal-model-bmsnetwork.git",
-    "spinal-model-timeseries": "git+https://github.com/spinalcom/spinal-model-timeseries.git"
+    "spinal-model-graph": "git+https://github.com/spinalcom/spinal-model-graph.git",
+    "spinal-model-timeseries": "git+https://github.com/spinalcom/spinal-model-timeseries.git#develop"
   },
   "devDependencies": {
+    "@types/node": "^17.0.15",
+    "@types/node-cron": "^3.0.1",
     "typescript": "^4.4.3"
   }
 }

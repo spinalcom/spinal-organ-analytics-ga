@@ -1,3 +1,4 @@
+import { SpinalNodeRef } from "spinal-env-viewer-graph-service";
 import { NetworkService } from "spinal-model-bmsnetwork";
 export declare const networkService: NetworkService;
 /**
@@ -31,7 +32,7 @@ export declare function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEnd
  * @param {string} nameFilter - Name of the control endpoint we want to capture
  * @return {*}
  */
-export declare function getControlEndpoint(nodeId: string, nameFilter: string): Promise<false | import("spinal-env-viewer-graph-service/declarations/GraphManagerService").SpinalNodeRef>;
+export declare function getControlEndpoint(nodeId: string, nameFilter: string): Promise<false | SpinalNodeRef>;
 /**
  *
  * Function that returns all potential endpoints (parent of BmsDevice)
@@ -67,7 +68,7 @@ export declare function getValueFromControlEndpoint(nodeId: string, controlEndpo
  * @param {string} filter
  * @return {*}
  */
-export declare function filterBmsEndpoint(endpointList: any, filter: string): Promise<any[]>;
+export declare function filterBmsEndpoint(endpointList: any, filter: string): Promise<SpinalNodeRef[]>;
 /**
  *
  * Function that calculate an analytic value using the control endpoints of children nodes
@@ -89,3 +90,4 @@ export declare function calculateAnalyticsFromChildrenNoAverage(elementId: strin
  * @param {*} type - Type ( not really used )
  */
 export declare function updateControlEndpointWithAnalytic(target: any, valueToPush: any, dataType: any, type: any): Promise<void>;
+export declare function removeFromlist(endpointList: Array<SpinalNodeRef>, target: Array<string>): SpinalNodeRef[];

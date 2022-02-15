@@ -28,22 +28,29 @@ async function calculateAnalyticsOccupationRate(elementId) {
     if (monitorableControlEndpoint != false) {
         let currentDataMonitorable = (await utils.networkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
         if (currentDataMonitorable == "Monitorée") {
+            //Si la pièce est monitoré, on récupère l'ensemble des capteurs + télécommande
             let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
-                if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
+                if (elt.info.type.get() == "BIMObject" && (elt.info.name.get().includes(filterMulticapteur) || elt.info.name.get().includes(filterTelecommande)) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
                     spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
                     return true;
                 }
                 return false;
             });
             let allBmsEndpoints = await utils.filterBmsEndpoint(multicapteur, filterOccupationBmsEndpoint);
+            console.log(allBmsEndpoints);
             for (let bms of allBmsEndpoints) {
                 let spinalTs = await utils.networkService.getTimeseries(bms.id.get());
                 let dataFromLastHour = await spinalTs.getFromIntervalTime(lastHourDate);
+                console.log(dataFromLastHour);
                 for (let i = 0; i < dataFromLastHour.length; i++) {
                     analyticResults[i] = analyticResults[i] | dataFromLastHour[i].value;
                 }
             }
         }
+        //Si c'est une piece non monitorée renvoyé NaN
+        else
+            return NaN;
+        console.log(analyticResults);
         for (let res of analyticResults) {
             rate += (res / (analyticResults.length));
         }
@@ -116,35 +123,39 @@ async function calculateAnalyticsTemperature(elementId) {
     if (monitorableControlEndpoint != false) {
         let currentDataMonitorable = (await utils.networkService.getData(monitorableControlEndpoint.id.get())).currentValue.get();
         if (currentDataMonitorable == "Monitorée") {
+            //Si la pièce est monitoré, on récupère l'ensemble des capteurs + télécommande
             let multicapteur = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
-                if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterMulticapteur) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
+                if (elt.info.type.get() == "BIMObject" && (elt.info.name.get().includes(filterMulticapteur) || elt.info.name.get().includes(filterTelecommande)) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
                     spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
                     return true;
                 }
                 return false;
             });
-            let telecommande = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(elementId, spatialId, elt => {
-                if (elt.info.type.get() == "BIMObject" && elt.info.name.get().includes(filterTelecommande) && elt.hasRelation(OBJECT_TO_BMS_ENDPOINT_RELATION, spinal_model_graph_1.SPINAL_RELATION_PTR_LST_TYPE)) {
-                    spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
-                    return true;
-                }
-                return false;
-            });
-            let mBmsEndpoints = await utils.filterBmsEndpoint(multicapteur, filterTempBmsEndpoint);
-            let tBmsEndpoints = await utils.filterBmsEndpoint(telecommande, filterTempBmsEndpoint);
-            let allBmsEndpoints = mBmsEndpoints.concat(tBmsEndpoints);
+            //On récupère les BmsEndpoint de température grâce au filtre 'Temp'
+            let allBmsEndpoints = await utils.filterBmsEndpoint(multicapteur, filterTempBmsEndpoint);
             let length = allBmsEndpoints.length;
             for (let bms of allBmsEndpoints) {
-                const valMin = await SpinalServiceTimeserie.getMin(bms.id.get(), dateInter);
-                let tmp = await SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
-                if (valMin < -20 || tmp == -1) {
+                //calculer la température moyenne d'une pièce sans prendre en compte les valeurs négatives (valeur par défaut -327) 
+                let tmp = await SpinalServiceTimeserie.getMeanWithoutNegativeValues(bms.id.get(), dateInter);
+                //Si la moyenne est NaN, on ne prend pas en compte le BmsEndpoint. Sinon on le somme dans value  
+                if (isNaN(tmp)) {
                     length--;
-                    continue;
                 }
-                value += tmp;
+                else {
+                    value += tmp;
+                }
             }
-            if (length != 0)
+            //On calcul la moyenne des valeurs de température s'il reste encore des BmsEndpoint après le filtrage
+            if (length != 0) {
                 value = value / length;
+            }
+            else {
+                return NaN;
+            }
+        }
+        //Si c'est une piece non monitorée renvoyé NaN
+        else {
+            value = NaN;
         }
     }
     return value;

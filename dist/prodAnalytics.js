@@ -16,9 +16,9 @@ async function calculateAnalyticsEnergyProduction(elementId) {
     let endpointList = await utils.getBmsDevices(elementId);
     for (let filter of filters) {
         let bms = await utils.filterBmsEndpoint(endpointList, filter);
+        // console.log(bms);
         allBmsEndpoints = allBmsEndpoints.concat(bms);
     }
-    //console.log(allBmsEndpoints);
     valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(allBmsEndpoints);
     return valueToPush;
 }
@@ -35,7 +35,7 @@ async function calculateAnalyticsSunlightProduction(elementId) {
     let filter = "Ensoleillement";
     let endpointList = await utils.getBmsDevices(elementId);
     let bms = await utils.filterBmsEndpoint(endpointList, filter);
-    console.log(bms);
+    //console.log(bms);
     valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bms);
     return valueToPush;
 }

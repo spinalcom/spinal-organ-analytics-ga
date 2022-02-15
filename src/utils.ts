@@ -1,5 +1,5 @@
 
-import { SpinalGraphService} from "spinal-env-viewer-graph-service";
+import { SpinalGraphService, SpinalNodeRef} from "spinal-env-viewer-graph-service";
 import { SpinalContext, SpinalGraph, SpinalNode, SPINAL_RELATION_LST_PTR_TYPE, SPINAL_RELATION_PTR_LST_TYPE } from "spinal-model-graph";
 import { SpinalTimeSeries} from "spinal-model-timeseries"
 import { spinalControlPointService } from "spinal-env-viewer-plugin-control-endpoint-service";
@@ -68,25 +68,38 @@ export async function sumTimeSeriesOfBmsEndpoints(bmsEndpoints: any) {
  */
 export async function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints: any) {
     let sum = 0;
-    for (let bms of bmsEndpoints) {
-        let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
-        let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-        let spinalTs : SpinalTimeSeries = await timeSeriesNode.getElement();
-        
-        let valueLastHour = undefined
-        let value = undefined
-        let data = await spinalTs.getDataFromLastHours();
-        for await ( const x of data){
-            if (!valueLastHour) {
-                valueLastHour = x.value;
+
+    const end = new Date();
+    end.setMinutes(1,0,0);
+
+    const start = new Date();
+    start.setHours(start.getHours() - 1,-1,0,0);
+
+    if(bmsEndpoints.length !== 0){
+        for (let bms of bmsEndpoints) {
+            let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
+            let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
+            let spinalTs : SpinalTimeSeries = await timeSeriesNode.getElement();
+            
+            let valueLastHour = undefined
+            let value = undefined
+            let data = await spinalTs.getFromIntervalTimeGen(start,end);
+            for await (const x of data){
+                // if(x.value > 0){                  //Prendre que la valeur positif d'un compteur
+                    if (!valueLastHour) {
+                        valueLastHour = x.value;
+                    }
+                    value = x.value;
+                // }
             }
-            value = x.value;
+            console.log("h-1 value:",valueLastHour, " | current value:",value);
+            sum += (value - valueLastHour);
         }
-        console.log("h-1 value:",valueLastHour, " | current value:",value);
-        sum += (value - valueLastHour);
+        console.log(" TOTAL DIFFERENCE : ", sum);
+        return sum;
     }
-    console.log(" TOTAL DIFFERENCE : ", sum);
-    return sum;
+    else{ 
+        return NaN;}
 }
 
 /**
@@ -177,8 +190,8 @@ export async function getValueFromControlEndpoint (nodeId :string , controlEndpo
  * @param {string} filter
  * @return {*} 
  */
-export async function filterBmsEndpoint(endpointList: any, filter: string) {
-    let outputBmsEndpoint = [];
+export async function filterBmsEndpoint(endpointList: any, filter: string): Promise<SpinalNodeRef[]> {
+    let outputBmsEndpoint : SpinalNodeRef[] = [];
     for (const endpoint of endpointList) {
         let bmsEndpointGroups = await SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpointGroup"]);
         if(bmsEndpointGroups.length !=0){
@@ -226,7 +239,7 @@ export async function calculateAnalyticsFromChildren(elementId : string, typeOfE
                     if (controlEndpoint != false){
                         const loaded = await controlEndpoint.element.load();
                         let val = loaded.get().currentValue;
-                        if(val>0){
+                        if(!isNaN(val)){
                             res =  res + val;
                             count += 1;
                         }
@@ -235,7 +248,7 @@ export async function calculateAnalyticsFromChildren(elementId : string, typeOfE
                 }
             }
         } // fin boucle sur les rooms
-        if(count == 0) return 0;
+        if(count == 0) return NaN;
         return res/count;
 
     } else if(typeOfElement == "geographicBuilding") {
@@ -248,14 +261,14 @@ export async function calculateAnalyticsFromChildren(elementId : string, typeOfE
             if (controlEndpoint != false){
                 const loaded = await controlEndpoint.element.load();
                 let val = loaded.get().currentValue;
-                if(val>0){
+                if(!isNaN(val)){
                     //console.log("floor ",val);
                     res =  res + val;
                     count += 1;
                 }
             }
         } // fin boucle sur les floors
-        if(count == 0) return 0;
+        if(count == 0) return NaN;
         return res/count;
     }
 }
@@ -279,16 +292,15 @@ export async function calculateAnalyticsFromChildrenNoAverage(elementId : string
                     if (controlEndpoint != false){
                         const loaded = await controlEndpoint.element.load();
                         let val = loaded.get().currentValue;
-                        if(val>0){
+                        if(!isNaN(val)){
                             res =  res + val;
                             count += 1;
                         }
-                        
                     }
                 }
             }
         } // fin boucle sur les rooms
-        if(count == 0) return 0;
+        if(count == 0) return NaN;
         return res;
 
     } else if(typeOfElement == "geographicBuilding") {
@@ -298,17 +310,17 @@ export async function calculateAnalyticsFromChildrenNoAverage(elementId : string
         for(const floor of floors) {
             // On récupère le controlEndpoint
             const controlEndpoint = await getControlEndpoint(floor.id.get(),controlEndpointName);
+            // console.log(controlEndpoint);
             if (controlEndpoint != false){
                 const loaded = await controlEndpoint.element.load();
                 let val = loaded.get().currentValue;
-                if(val>0){
-                    //console.log("floor ",val);
+                if(!isNaN(val)){
                     res =  res + val;
                     count += 1;
                 }
             }
         } // fin boucle sur les floors
-        if(count == 0) return 0;
+        if(count == 0) return NaN;
         return res;
     }
 }
@@ -339,9 +351,19 @@ export async function updateControlEndpointWithAnalytic(target:any, valueToPush:
             type: type,
             nodeTypeName: "BmsEndpoint"// should be SpinalBmsEndpoint.nodeTypeName || 'BmsEndpoint'
         };
-        await networkService.updateEndpoint(target,input);
+        const time = new Date().setMinutes(0,0,0);   //Register in TimeSeries at hh:00:00
+        await networkService.updateEndpoint(target,input,time);
     }
     else{
         console.log(valueToPush + " value to push in node : " + target.name.get() + " -- ABORTED !");
     }
+}
+
+
+export function removeFromlist(endpointList:Array<SpinalNodeRef> ,target:Array<string>){
+ 
+    return endpointList.filter(x =>{
+        return !target.includes(x.name.get())
+    });
+   
 }

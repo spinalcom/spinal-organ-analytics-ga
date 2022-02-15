@@ -23,7 +23,15 @@ export declare function calculateAnalyticsGlobalCVC(elementId: string, typeOfEle
  */
 export declare function calculateAnalyticsGlobalLighting(elementId: string, typeOfElement: string): Promise<any>;
 /**
- * Calculate the global water consumption for building and floors.
+ * Calculate the global water consumption of toilets for building and floors.
+ * @export
+ * @param {string} elementId - Id of the node linked to the analytic ( and the control endpoint )
+ * @param {string} typeOfElement - Type of the spatial node. Expecting either a building or a floor for this parameter.
+ * @return {*}
+ */
+export declare function calculateAnalyticsGlobalWaterToilet(elementId: string, typeOfElement: string): Promise<any>;
+/**
+ * Calculate the global water consumption for building.
  * @export
  * @param {string} elementId - Id of the node linked to the analytic ( and the control endpoint )
  * @param {string} typeOfElement - Type of the spatial node. Expecting either a building or a floor for this parameter.
