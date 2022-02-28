@@ -10,16 +10,12 @@ const utils = require("./utils");
  * @return {*}
  */
 async function calculateAnalyticsEnergyProduction(elementId) {
-    let allBmsEndpoints = [];
     let valueToPush = undefined;
-    let filters = ["Photovoltaique", "Geothermie", "TD Velo"];
+    let filter = "Production Total";
     let endpointList = await utils.getBmsDevices(elementId);
-    for (let filter of filters) {
-        let bms = await utils.filterBmsEndpoint(endpointList, filter);
-        // console.log(bms);
-        allBmsEndpoints = allBmsEndpoints.concat(bms);
-    }
-    valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(allBmsEndpoints);
+    let BmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+    // console.log(BmsEndpoints);
+    valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(BmsEndpoints);
     return valueToPush;
 }
 exports.calculateAnalyticsEnergyProduction = calculateAnalyticsEnergyProduction;
@@ -34,9 +30,9 @@ async function calculateAnalyticsSunlightProduction(elementId) {
     let valueToPush = undefined;
     let filter = "Ensoleillement";
     let endpointList = await utils.getBmsDevices(elementId);
-    let bms = await utils.filterBmsEndpoint(endpointList, filter);
-    //console.log(bms);
-    valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bms);
+    let allBmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+    // console.log(allBmsEndpoints);
+    valueToPush = await utils.TimeSeriesOfBmsEndpointsMeanFromLastHour(allBmsEndpoints);
     return valueToPush;
 }
 exports.calculateAnalyticsSunlightProduction = calculateAnalyticsSunlightProduction;

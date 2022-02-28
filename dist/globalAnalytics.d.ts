@@ -65,3 +65,4 @@ export declare function VINCI_specificUpdate_Lighting_Floors_CP_Analytics(target
  */
 export declare function VINCI_specificUpdate_CVC_Floors_CP_Analytics(targetNode: any, elementId: string, typeOfElement: string, analyticName?: string): Promise<void>;
 export declare function calculateAnalyticsGlobalHeat(elementId: string, typeOfElement: string): Promise<any>;
+export declare function calculateAnalyticsNumberOfPersons(elementId: string, typeOfElement: string): Promise<any>;

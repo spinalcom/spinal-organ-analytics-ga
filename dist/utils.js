@@ -1,9 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.removeFromlist = exports.updateControlEndpointWithAnalytic = exports.calculateAnalyticsFromChildrenNoAverage = exports.calculateAnalyticsFromChildren = exports.filterBmsEndpoint = exports.getValueFromControlEndpoint = exports.getEndpoints = exports.getBmsDevices = exports.getControlEndpoint = exports.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour = exports.sumTimeSeriesOfBmsEndpoints = exports.getAnalyticsGroup = exports.networkService = void 0;
+exports.getAttributeForWaterConsumption = exports.TimeSeriesOfBmsEndpointsMeanFromLastHour = exports.removeFromlist = exports.updateControlEndpointWithAnalytic = exports.calculateAnalyticsFromChildrenNoAverage = exports.calculateAnalyticsFromChildren = exports.filterBmsEndpoint = exports.getValueFromControlEndpoint = exports.getEndpoints = exports.getBmsDevices = exports.getControlEndpoint = exports.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour = exports.sumTimeSeriesOfBmsEndpoints = exports.getAnalyticsGroup = exports.networkService = void 0;
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
+const spinal_model_timeseries_1 = require("spinal-model-timeseries");
 const spinal_env_viewer_plugin_control_endpoint_service_1 = require("spinal-env-viewer-plugin-control-endpoint-service");
 const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
+const spinal_env_viewer_plugin_documentation_service_1 = require("spinal-env-viewer-plugin-documentation-service");
+const SpinalServiceTimeserie = new spinal_model_timeseries_1.SpinalServiceTimeseries();
 exports.networkService = new spinal_model_bmsnetwork_1.NetworkService();
 /**
  *
@@ -359,4 +362,40 @@ function removeFromlist(endpointList, target) {
     });
 }
 exports.removeFromlist = removeFromlist;
+async function TimeSeriesOfBmsEndpointsMeanFromLastHour(bmsEndpoints) {
+    let mean = 0;
+    let dateInter = {
+        end: new Date(),
+        start: new Date()
+    };
+    dateInter.end.setMinutes(1, 0, 0);
+    dateInter.start.setHours(dateInter.start.getHours() - 1, -1, 0, 0);
+    let length = bmsEndpoints.length;
+    if (length !== 0) {
+        for (let bms of bmsEndpoints) {
+            let val = await SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
+            if (isNaN(val)) {
+                length--;
+            }
+            else {
+                mean += val;
+            }
+        }
+        console.log(" MOYENNE TOTAL : ", mean);
+        return mean;
+    }
+    else {
+        return NaN;
+    }
+}
+exports.TimeSeriesOfBmsEndpointsMeanFromLastHour = TimeSeriesOfBmsEndpointsMeanFromLastHour;
+async function getAttributeForWaterConsumption() {
+    let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+    let buildingId = (await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(spatialId, ["hasGeographicBuilding"]))[0].id.get();
+    let buildingNode = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(buildingId);
+    let attribute = (await spinal_env_viewer_plugin_documentation_service_1.default.findOneAttributeInCategory(buildingNode, "Analysis settings", "water consumption/hour")).value.get();
+    // console.log(attribute);
+    return attribute;
+}
+exports.getAttributeForWaterConsumption = getAttributeForWaterConsumption;
 //# sourceMappingURL=utils.js.map

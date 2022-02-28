@@ -1,11 +1,12 @@
 
 import { SpinalGraphService, SpinalNodeRef} from "spinal-env-viewer-graph-service";
 import { SpinalContext, SpinalGraph, SpinalNode, SPINAL_RELATION_LST_PTR_TYPE, SPINAL_RELATION_PTR_LST_TYPE } from "spinal-model-graph";
-import { SpinalTimeSeries} from "spinal-model-timeseries"
+import { SpinalTimeSeries, SpinalServiceTimeseries} from "spinal-model-timeseries"
 import { spinalControlPointService } from "spinal-env-viewer-plugin-control-endpoint-service";
 import { NetworkService, InputDataEndpoint }  from "spinal-model-bmsnetwork"
+import AttributeService from 'spinal-env-viewer-plugin-documentation-service';
 
-
+const SpinalServiceTimeserie = new SpinalServiceTimeseries ()
 export const networkService = new NetworkService()
 
 /**
@@ -366,4 +367,39 @@ export function removeFromlist(endpointList:Array<SpinalNodeRef> ,target:Array<s
         return !target.includes(x.name.get())
     });
    
+}
+
+
+
+export async function TimeSeriesOfBmsEndpointsMeanFromLastHour(bmsEndpoints: any) {
+    let mean = 0;
+    let dateInter = {
+        end : new Date(),
+        start : new Date()
+    };
+    dateInter.end.setMinutes(1,0,0);
+    dateInter.start.setHours(dateInter.start.getHours() - 1,-1,0,0);
+    let length = bmsEndpoints.length;
+    if(length !== 0){
+        for(let bms of bmsEndpoints){
+            let val = await SpinalServiceTimeserie.getMean(bms.id.get(),dateInter);
+            if (isNaN(val)) {length--;}
+            else {mean+= val;}
+        }
+        console.log(" MOYENNE TOTAL : ", mean);
+        return mean;
+    }
+    else{ 
+        return NaN;}
+}
+
+
+
+export async function getAttributeForWaterConsumption() {
+    let spatialId = (SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
+    let buildingId = (await SpinalGraphService.getChildren(spatialId,["hasGeographicBuilding"]))[0].id.get();
+    let buildingNode = SpinalGraphService.getRealNode(buildingId);
+    let attribute = (await AttributeService.findOneAttributeInCategory(buildingNode,"Analysis settings","water consumption/hour")).value.get();
+    // console.log(attribute);
+    return attribute;
 }

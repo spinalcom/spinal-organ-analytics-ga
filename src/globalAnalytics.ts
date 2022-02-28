@@ -17,22 +17,35 @@ export async function calculateAnalyticsGlobalEnergy(elementId: string, typeOfEl
     let valueToPush = undefined;
     let filter = "";
     let bmsEndpoints =[];
+    let elementNode = SpinalGraphService.getRealNode(elementId);
 
     if (typeOfElement == "geographicBuilding") {
-        filter = "TGBT A N - Comptage Energie Active Total";
+        filter = "Comptage Energie Active Total";
         endpointList = await utils.getBmsDevices(elementId);
         bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+        // console.log(bmsEndpoints);
         valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
 
     }
     else if (typeOfElement == "geographicFloor") {
+        switch(elementNode.info.name.get()){
+            case "0":
+                filter = "Comptage Energie - General - TD ES 001";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                // console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);;
+                break;
 
-        filter = "Comptage Energie - General - TD-A";
-        endpointList = await utils.getBmsDevices(elementId);
-        bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-        //console.log(bmsEndpoints);
-        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
-        }
+            default:
+                filter = "Comptage Energie - General";
+                endpointList = await utils.getBmsDevices(elementId);
+                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+                // console.log(bmsEndpoints);
+                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+                break;
+        }    
+    }
         
     
     else {
@@ -80,34 +93,21 @@ export async function calculateAnalyticsGlobalCVC(elementId: string, typeOfEleme
  * @return {*} 
  */
 export async function calculateAnalyticsGlobalLighting(elementId: string, typeOfElement: string) {
-    let endpointList = [];
     let valueToPush = undefined;
-    let filter = "";
-    let bmsEndpoints = [];
-    let elementNode = SpinalGraphService.getRealNode(elementId);
 
     if (typeOfElement == "geographicBuilding") {
         // il faut récupérer la conso de chaque étage depuis leur control point respectifs : une fonction spécifique pour Vinci a été créée
         valueToPush = await await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Eclairage");
+        console.log("TOTAL = ", valueToPush);
     }
     else if (typeOfElement == "geographicFloor") {
-        switch(elementNode.info.name.get()){
-            case "0":
-                filter = "Comptage Energie - Eclairage - TDSG-C-00";
-                endpointList = await utils.getBmsDevices(elementId);
-                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-                // console.log(bmsEndpoints);
-                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
-                break;
-
-            default:
-                filter = "Comptage Energie - Eclairage - TD-C";
-                endpointList = await utils.getBmsDevices(elementId);
-                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-                // console.log(bmsEndpoints);
-                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
-                break;
-        }
+        let filter = "Comptage Energie - Eclairage";
+        let endpointList = await utils.getBmsDevices(elementId);
+        let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+        // for(let bms of bmsEndpoints){
+        //     console.log(bms.name.get());
+        // }
+        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
     }
     else {
         console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
@@ -332,4 +332,35 @@ export async function calculateAnalyticsGlobalHeat(elementId: string, typeOfElem
     }
 
     return valueToPush;
+}
+
+
+export async function calculateAnalyticsNumberOfPersons(elementId: string, typeOfElement: string) {
+
+    let valueToPush = undefined;
+    let elementNode = SpinalGraphService.getRealNode(elementId);
+    let attribute = await utils.getAttributeForWaterConsumption();
+    
+    if (typeOfElement == "geographicBuilding") {
+        valueToPush = (await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Nombre de personnes"));
+        console.log("TOTAL = ", valueToPush);
+    }
+    else if (typeOfElement == "geographicFloor") {
+        // On récupère le controlEndpoint
+        const controlEndpoint = await utils.getControlEndpoint(elementId,"Eau sanitaire");
+        if (controlEndpoint != false){
+            const loaded = await controlEndpoint.element.load();
+            let val = loaded.get().currentValue;
+            if(!isNaN(val)){
+                valueToPush =  val/attribute;  //une personne consomme en moyenne 4l/heure
+            }
+            console.log("Number of persons = " + valueToPush + " in " + elementNode.info.name.get());
+        }
+    }
+
+    else {
+            console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
+        }
+    
+        return valueToPush;
 }
