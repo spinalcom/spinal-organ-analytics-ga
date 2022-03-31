@@ -338,8 +338,9 @@ export async function calculateAnalyticsGlobalHeat(elementId: string, typeOfElem
 export async function calculateAnalyticsNumberOfPersons(elementId: string, typeOfElement: string) {
 
     let valueToPush = undefined;
+    let attribute = undefined;
     let elementNode = SpinalGraphService.getRealNode(elementId);
-    let attribute = await utils.getAttributeForWaterConsumption();
+    attribute = await utils.getAttributeForWaterConsumption();
     
     if (typeOfElement == "geographicBuilding") {
         valueToPush = (await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Nombre de personnes"));
@@ -351,7 +352,7 @@ export async function calculateAnalyticsNumberOfPersons(elementId: string, typeO
         if (controlEndpoint != false){
             const loaded = await controlEndpoint.element.load();
             let val = loaded.get().currentValue;
-            if(!isNaN(val)){
+            if(!isNaN(val) && attribute!==undefined){
                 valueToPush =  val/attribute;  //une personne consomme en moyenne 4l/heure
             }
             console.log("Number of persons = " + valueToPush + " in " + elementNode.info.name.get());

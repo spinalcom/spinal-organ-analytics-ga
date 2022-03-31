@@ -92,4 +92,4 @@ export declare function calculateAnalyticsFromChildrenNoAverage(elementId: strin
 export declare function updateControlEndpointWithAnalytic(target: any, valueToPush: any, dataType: any, type: any): Promise<void>;
 export declare function removeFromlist(endpointList: Array<SpinalNodeRef>, target: Array<string>): SpinalNodeRef[];
 export declare function TimeSeriesOfBmsEndpointsMeanFromLastHour(bmsEndpoints: any): Promise<number>;
-export declare function getAttributeForWaterConsumption(): Promise<any>;
+export declare function getAttributeForWaterConsumption(): Promise<string | number | boolean>;

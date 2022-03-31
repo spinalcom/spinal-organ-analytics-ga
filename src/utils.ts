@@ -46,11 +46,18 @@ export async function getAnalyticsGroup() {
 export async function sumTimeSeriesOfBmsEndpoints(bmsEndpoints: any) {
     let sum = 0;
     for (let bms of bmsEndpoints) {
-        let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
-        if(timeSeriesModel.length !=0){
-            let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-            let spinalTs = await timeSeriesNode.getElement();
-            let currentData = await spinalTs.getCurrent();
+        // let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
+        // if(timeSeriesModel.length !=0){
+        //     let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
+        //     let spinalTs = await timeSeriesNode.getElement();
+        //     let currentData = await spinalTs.getCurrent();
+        //     if(currentData != undefined){
+        //         sum += currentData.value;
+        //     }
+        // }
+        let timeSeries = await SpinalServiceTimeserie.getTimeSeries(bms.id.get());
+        if(timeSeries!==undefined){
+            let currentData = await timeSeries.getCurrent();
             if(currentData != undefined){
                 sum += currentData.value;
             }
@@ -78,13 +85,14 @@ export async function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpo
 
     if(bmsEndpoints.length !== 0){
         for (let bms of bmsEndpoints) {
-            let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
-            let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-            let spinalTs : SpinalTimeSeries = await timeSeriesNode.getElement();
+            // let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
+            let timeSeries = await SpinalServiceTimeserie.getTimeSeries(bms.id.get());
+            // let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
+            // let spinalTs : SpinalTimeSeries = await timeSeriesNode.getElement();
             
             let valueLastHour = undefined
             let value = undefined
-            let data = await spinalTs.getFromIntervalTimeGen(start,end);
+            let data = await timeSeries.getFromIntervalTimeGen(start,end);
             for await (const x of data){
                 // if(x.value > 0){                  //Prendre que la valeur positif d'un compteur
                     if (!valueLastHour) {
@@ -399,7 +407,10 @@ export async function getAttributeForWaterConsumption() {
     let spatialId = (SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
     let buildingId = (await SpinalGraphService.getChildren(spatialId,["hasGeographicBuilding"]))[0].id.get();
     let buildingNode = SpinalGraphService.getRealNode(buildingId);
-    let attribute = (await AttributeService.findOneAttributeInCategory(buildingNode,"Analysis settings","water consumption/hour")).value.get();
-    // console.log(attribute);
-    return attribute;
+    const attribute = (await AttributeService.findOneAttributeInCategory(buildingNode,"Analysis settings","water consumption/hour"));
+    if(attribute !== -1){
+        let attrVal = attribute.value.get();
+        return attrVal;
+    }
+    return undefined;
 }

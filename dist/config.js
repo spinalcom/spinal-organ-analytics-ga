@@ -32,14 +32,4 @@ exports.default = {
     digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission"
     // interval: 3600000
 };
-// remote testing Batiment A vinci
-/*
-export default {
-    userId: 168,
-    userPassword: "b4v4SsE2",
-    hubHost: "92.222.24.29",
-    hubPort: 10150,
-    digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission",
-    interval: 3600000
-};*/ 
 //# sourceMappingURL=config.js.map

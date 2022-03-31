@@ -24,7 +24,7 @@
     "spinal-env-viewer-plugin-group-manager-service": "git+https://github.com/spinalcom/spinal-env-viewer-plugin-group-manager-service.git",
     "spinal-model-bmsnetwork": "git+https://github.com/spinalcom/spinal-model-bmsnetwork.git",
     "spinal-model-graph": "git+https://github.com/spinalcom/spinal-model-graph.git",
-    "spinal-model-timeseries": "git+https://github.com/spinalcom/spinal-model-timeseries.git#develop"
+    "spinal-model-timeseries": "git+https://github.com/spinalcom/spinal-model-timeseries.git"
   },
   "devDependencies": {
     "@types/node": "^17.0.15",
