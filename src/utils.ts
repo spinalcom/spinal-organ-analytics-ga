@@ -46,15 +46,6 @@ export async function getAnalyticsGroup() {
 export async function sumTimeSeriesOfBmsEndpoints(bmsEndpoints: any) {
     let sum = 0;
     for (let bms of bmsEndpoints) {
-        // let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
-        // if(timeSeriesModel.length !=0){
-        //     let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-        //     let spinalTs = await timeSeriesNode.getElement();
-        //     let currentData = await spinalTs.getCurrent();
-        //     if(currentData != undefined){
-        //         sum += currentData.value;
-        //     }
-        // }
         let timeSeries = await SpinalServiceTimeserie.getTimeSeries(bms.id.get());
         if(timeSeries!==undefined){
             let currentData = await timeSeries.getCurrent();
@@ -85,10 +76,7 @@ export async function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpo
 
     if(bmsEndpoints.length !== 0){
         for (let bms of bmsEndpoints) {
-            // let timeSeriesModel = await SpinalGraphService.getChildren(bms.id.get(), ["hasTimeSeries"]);
             let timeSeries = await SpinalServiceTimeserie.getTimeSeries(bms.id.get());
-            // let timeSeriesNode = SpinalGraphService.getRealNode(timeSeriesModel[0].id.get());
-            // let spinalTs : SpinalTimeSeries = await timeSeriesNode.getElement();
             
             let valueLastHour = undefined
             let value = undefined

@@ -45,23 +45,14 @@ class SpinalMain {
      * @return {*}
      * @memberof SpinalMain
      */
-    // public init() {
-    //     return new Promise((resolve, reject) => {
-    //         spinalCore.load(this.connect, config.digitalTwinPath, async (graph: any) => {
-    //             await SpinalGraphService.setGraph(graph);
-    //             resolve(graph)
-    //         }, () => {
-    //             reject()
-    //         })
-    //     });
-    // }
-    init(succes, error) {
-        spinal_core_connectorjs_type_1.spinalCore.load(this.connect, config_1.default.digitalTwinPath, async (graph) => {
-            console.log("I'm connected");
-            await spinal_env_viewer_graph_service_1.SpinalGraphService.setGraph(graph);
-            succes(graph);
-        }, () => {
-            error();
+    init() {
+        return new Promise((resolve, reject) => {
+            spinal_core_connectorjs_type_1.spinalCore.load(this.connect, config_1.default.digitalTwinPath, async (graph) => {
+                await spinal_env_viewer_graph_service_1.SpinalGraphService.setGraph(graph);
+                resolve(graph);
+            }, () => {
+                reject();
+            });
         });
     }
     /**
@@ -84,6 +75,7 @@ class SpinalMain {
                 let analyticName = analytic.name.get();
                 // if(analyticName == "Monitorable") continue;
                 // if(analyticName == "Nombre de tickets") continue;
+                // if(analyticName == "Taux d'occupation") continue;
                 const groups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analytic.id.get(), [spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
                     const elements = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic
@@ -102,18 +94,18 @@ class SpinalMain {
                                         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
                                         break;
-                                    // case "Chauffage":
-                                    //     analyticsResult =  await globalAnalytics.calculateAnalyticsGlobalHeat(element.id.get(),typeOfElement);
-                                    //     analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                    //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //     console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     break;
-                                    // case "Climatisation":
-                                    //     analyticsResult = await globalAnalytics.calculateAnalyticsGlobalCVC(element.id.get(), typeOfElement);
-                                    //     analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                    //     await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //     console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     break;
+                                    case "Chauffage":
+                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalHeat(element.id.get(), typeOfElement);
+                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
+                                        break;
+                                    case "Climatisation":
+                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalAirConditioning(element.id.get(), typeOfElement);
+                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
+                                        break;
                                     case "Eclairage":
                                         analyticsResult = await globalAnalytics.calculateAnalyticsGlobalLighting(element.id.get(), typeOfElement);
                                         analyticsResult = Math.round(analyticsResult * 1000) / 1000;
@@ -152,9 +144,19 @@ class SpinalMain {
                                         break;
                                     // case "Efficacité de production d'énergie solaire":
                                     //     break;
-                                    // case "Gain en émission de CO2":
-                                    //     break;
-                                    // case "Taux d'autoconsommation énergétique":
+                                    case "Gain en émission de CO2":
+                                        analyticsResult = await prodAnalytics.calculateAnalyticsCO2Gain(element.id.get());
+                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, 0, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
+                                        break;
+                                    case "Taux d'autoconsommation énergétique":
+                                        analyticsResult = await prodAnalytics.calculateAnalyticsAutoConsumption(element.id.get());
+                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, 0, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
+                                        break;
+                                    // case "Nombre d'espaces occupés":
                                     //     break;
                                     // case "Qualité de l'air":
                                     //     if(typeOfElement == "geographicRoom"){
@@ -198,8 +200,6 @@ class SpinalMain {
                                     //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
                                     //     }
                                     //     break;
-                                    // case "Nombre d'espaces occupés":
-                                    //     break;
                                     // case "Taux d'occupation":
                                     //     if(typeOfElement == "geographicRoom"){
                                     //         analyticsResult = await gtbAnalytics.calculateAnalyticsOccupationRate(element.id.get());
@@ -228,7 +228,7 @@ class SpinalMain {
                                             iMon3++;
                                         break;
                                     default:
-                                        console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
+                                        // console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
                                         break;
                                 }
                             }
@@ -243,27 +243,33 @@ class SpinalMain {
         console.log("DONE");
     }
 }
+async function job() {
+    try {
+        const spinalMain = new SpinalMain();
+        await spinalMain.init();
+        await spinalMain.updateControlEndpoints();
+        setTimeout(() => {
+            console.log('STOP OK');
+            process.exit(0);
+        }, 1000 * 60 * 5); // (5min)
+    }
+    catch (error) {
+        console.error(error);
+        setTimeout(() => {
+            console.log('STOP ERROR');
+            process.exit(0);
+        }, 5000);
+    }
+}
 async function Main() {
     // start every 1h+10min
+    console.log('Organ Start');
     cron.schedule('10 * * * *', async () => {
-        console.log('Organ Start');
-        const spinalMain = new SpinalMain();
-        spinalMain.init(x => {
-            spinalMain.updateControlEndpoints();
-        }, y => {
-            setTimeout(() => {
-                console.log('STOP');
-                process.exit(0);
-            }, 5000);
-        });
+        console.log('Analytic job Start');
+        await job();
     });
-    // const spinalMain = new SpinalMain();
-    // await spinalMain.init();
-    // ///// TODO ////
-    // spinalMain.updateControlEndpoints();
-    // // setInterval(() => {
-    // //     spinalMain.updateControlEndpoints();
-    // // },config.interval)
+    // FOR DEBUG
+    // await job();
 }
 // Call main function
 Main();

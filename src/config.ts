@@ -22,12 +22,18 @@
  * <http://resources.spinalcom.com/licenses.pdf>.
  */
 
+
+require('dotenv').config();
+
+if (!process.env.USER_ID) {
+  console.error('NO .env set');
+}
+
 export default {
-    userId: 168,
-    userPassword: "gVG69c3Tv",
-    // hubHost: "141.94.246.104",
-    hubHost: "localhost",
-    hubPort: 11000,
-    digitalTwinPath: "/__users__/admin/Mission/Digital twin Mission"
-    // interval: 3600000
+  userId: parseInt(process.env.USER_ID),
+  userPassword: process.env.USER_PASSWORD,
+  hubHost: process.env.HUB_HOST,
+  hubPort: parseInt(process.env.HUB_PORT),
+  digitalTwinPath: process.env.DIGITALTWIN_PATH,
+//   NODE_ENV: process.env.NODE_ENV,
 };

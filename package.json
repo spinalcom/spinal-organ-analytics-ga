@@ -14,6 +14,7 @@
   "author": "SERIR rayane",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^16.0.0",
     "node-cron": "^3.0.0",
     "spinal-core-connectorjs_type": "git+https://github.com/spinalcom/spinal-core-connectorjs_type.git",
     "spinal-env-viewer-graph-service": "git+https://github.com/spinalcom/Spinal-Graph-Service.git",
