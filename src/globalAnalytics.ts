@@ -28,26 +28,18 @@ export async function calculateAnalyticsGlobalEnergy(elementId: string, typeOfEl
 
     }
     else if (typeOfElement == "geographicFloor") {
-        switch(elementNode.info.name.get()){
-            case "0":
-                filter = "Comptage Energie - General - TD ES 001";
-                endpointList = await utils.getBmsDevices(elementId);
-                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-                // console.log(bmsEndpoints);
-                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);;
-                break;
-
-            default:
-                filter = "Comptage Energie - General";
-                endpointList = await utils.getBmsDevices(elementId);
-                bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-                // console.log(bmsEndpoints);
-                valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
-                break;
+        if(elementNode.info.name.get()!=="0"){
+            filter = "Comptage Energie - General";
+            endpointList = await utils.getBmsDevices(elementId);
+            bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+            // console.log(bmsEndpoints);
+            valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+        }
+        else{
+            valueToPush = NaN;
         }    
     }
         
-    
     else {
         console.log("ERROR : TYPE = " + typeOfElement + " is not valid");
     }
@@ -107,20 +99,60 @@ export async function calculateAnalyticsGlobalAirConditioning(elementId: string,
  */
 export async function calculateAnalyticsGlobalLighting(elementId: string, typeOfElement: string) {
     let valueToPush = undefined;
+    let bmsEndpoints = [];
+    let endpointList = [];
+    let elementNode = SpinalGraphService.getRealNode(elementId);
+    let elementName = elementNode.info.name.get();
 
     if (typeOfElement == "geographicBuilding") {
         // il faut récupérer la conso de chaque étage depuis leur control point respectifs : une fonction spécifique pour Vinci a été créée
-        valueToPush = await await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Eclairage");
-        console.log("TOTAL = ", valueToPush);
+        let sumFloors = await utils.calculateAnalyticsFromChildrenNoAverage(elementId,typeOfElement,"Eclairage");
+
+        //Récupéré les donées d'éclairage des TDSG-B1 
+        let spatialContext = (SpinalGraphService.getContextWithType("geographicContext"))[0];
+        let spatialId = spatialContext.info.id.get();
+        let floors = await SpinalGraphService.findInContext(spatialId, spatialId, (elt:SpinalNode<any>) => {
+            if(elt.info.type.get() == "geographicFloor" && (elt.info.name.get() == "0" || elt.info.name.get() == "1" || elt.info.name.get() == "4" 
+            || elt.info.name.get() == "7" || elt.info.name.get() == "10" || elt.info.name.get() == "13" || elt.info.name.get() == "16"
+            || elt.info.name.get() == "19" || elt.info.name.get() == "22")){
+                (<any>SpinalGraphService)._addNode(elt);
+                return true;
+            }
+            return false;
+        });
+        for(let floor of floors){
+            if(floor.name.get()=="0"){
+                let filter = "Comptage Energie - Eclairage";
+                endpointList = await utils.getBmsDevices(floor.id.get());
+                let bmsEndpointsFLoor = await utils.filterBmsEndpoint(endpointList, filter);
+                bmsEndpoints =bmsEndpoints.concat(bmsEndpointsFLoor);
+            }
+            else{
+                let filter = "Comptage Energie - Eclairage - TDSG";
+                endpointList = await utils.getBmsDevices(floor.id.get());
+                let bmsEndpointsFLoor = await utils.filterBmsEndpoint(endpointList, filter);
+                bmsEndpoints =bmsEndpoints.concat(bmsEndpointsFLoor);
+            }    
+        }
+        // console.log(bmsEndpoints);
+        let lightTDSG = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+        
+        // sommer les deux valeurs
+        valueToPush = sumFloors + lightTDSG;
+        console.log("Eclairage total du bâtiment = ", valueToPush);
+
     }
     else if (typeOfElement == "geographicFloor") {
-        let filter = "Comptage Energie - Eclairage";
-        let endpointList = await utils.getBmsDevices(elementId);
-        let bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
-        // for(let bms of bmsEndpoints){
-        //     console.log(bms.name.get());
-        // }
-        valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+        let filter = "Comptage Energie - Eclairage - TD-";
+        if(elementName!=="0"){
+            endpointList = await utils.getBmsDevices(elementId);
+            bmsEndpoints = await utils.filterBmsEndpoint(endpointList, filter);
+            // console.log(bmsEndpoints);
+            valueToPush = await utils.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints);
+        }
+        else{
+            valueToPush = NaN;
+        } 
     }
     else {
         console.log("ERROR : TYPE = " + typeOfElement + " is not valid");

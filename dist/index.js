@@ -76,6 +76,9 @@ class SpinalMain {
                 // if(analyticName == "Monitorable") continue;
                 // if(analyticName == "Nombre de tickets") continue;
                 // if(analyticName == "Taux d'occupation") continue;
+                // if(analyticName == "Qualité de l'air") continue;
+                // if(analyticName == "Luminosité") continue;
+                // if(analyticName == "Temperature moyenne") continue;
                 const groups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analytic.id.get(), [spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
                     const elements = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic

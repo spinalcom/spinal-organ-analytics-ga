@@ -82,6 +82,10 @@ class SpinalMain {
                 // if(analyticName == "Monitorable") continue;
                 // if(analyticName == "Nombre de tickets") continue;
                 // if(analyticName == "Taux d'occupation") continue;
+                // if(analyticName == "Qualité de l'air") continue;
+                // if(analyticName == "Luminosité") continue;
+                // if(analyticName == "Temperature moyenne") continue;
+
                 
                 const groups = await SpinalGraphService.getChildren(analytic.id.get(), [spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
                 for (const group of groups) {
