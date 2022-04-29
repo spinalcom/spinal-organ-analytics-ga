@@ -169,14 +169,14 @@ class SpinalMain {
                                     case "Gain en émission de CO2":
                                         analyticsResult =  await prodAnalytics.calculateAnalyticsCO2Gain(element.id.get());
                                         analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, 0, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
                                         break;
 
                                     case "Taux d'autoconsommation énergétique":
                                         analyticsResult =  await prodAnalytics.calculateAnalyticsAutoConsumption(element.id.get());
                                         analyticsResult = Math.round(analyticsResult*1000)/1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, 0, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
                                         break;
 

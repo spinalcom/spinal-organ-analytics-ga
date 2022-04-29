@@ -150,13 +150,13 @@ class SpinalMain {
                                     case "Gain en émission de CO2":
                                         analyticsResult = await prodAnalytics.calculateAnalyticsCO2Gain(element.id.get());
                                         analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, 0, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
                                         break;
                                     case "Taux d'autoconsommation énergétique":
                                         analyticsResult = await prodAnalytics.calculateAnalyticsAutoConsumption(element.id.get());
                                         analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, 0, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
                                         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
                                         break;
                                     // case "Nombre d'espaces occupés":
