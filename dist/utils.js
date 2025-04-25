@@ -1,100 +1,34 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.getAttributeForWaterConsumption = exports.TimeSeriesOfBmsEndpointsMeanFromLastHour = exports.removeFromlist = exports.updateControlEndpointWithAnalytic = exports.calculateAnalyticsFromChildrenNoAverage = exports.calculateAnalyticsFromChildren = exports.filterBmsEndpoint = exports.getValueFromControlEndpoint = exports.getEndpoints = exports.getBmsDevices = exports.getControlEndpoint = exports.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour = exports.sumTimeSeriesOfBmsEndpoints = exports.getAnalyticsGroup = exports.networkService = void 0;
+exports.removeFromlist = exports.updateControlEndpointWithAnalytic = exports.CalculateAnalytic = exports.filterBmsEndpointList = exports.getBmsDevicesList = exports.getControlEndpoint = exports.getRooms = exports.networkService = void 0;
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
-const spinal_model_timeseries_1 = require("spinal-model-timeseries");
 const spinal_env_viewer_plugin_control_endpoint_service_1 = require("spinal-env-viewer-plugin-control-endpoint-service");
 const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
-const spinal_env_viewer_plugin_documentation_service_1 = require("spinal-env-viewer-plugin-documentation-service");
-const SpinalServiceTimeserie = new spinal_model_timeseries_1.SpinalServiceTimeseries();
 exports.networkService = new spinal_model_bmsnetwork_1.NetworkService();
 /**
  *
- * Function that returns the analytic groups ( first room analytics then floor analytics then building analytics )
+ * Function that returns rooms from the georaphic context
  * @export
  * @return {*}
  */
-async function getAnalyticsGroup() {
-    const context = spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("AnalyticGroupContext");
-    let orderedAnalyticGroups = [];
-    if (context.length != 0) {
+async function getRooms() {
+    const context = spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext");
+    if (context.length !== 0) {
         const contextId = context[0].info.id.get();
-        let analyticGroups = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(contextId, contextId, (elt) => {
-            if (elt.info.type.get() == "AnalyticGroup") {
-                spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(elt);
+        const rooms = await spinal_env_viewer_graph_service_1.SpinalGraphService.findInContext(contextId, contextId, (node) => {
+            if (node.info.type.get() === "geographicRoom") {
+                spinal_env_viewer_graph_service_1.SpinalGraphService._addNode(node);
                 return true;
             }
-            else
-                return false;
+            return false;
         });
-        // classement Piece puis Etage puis Batiment
-        let bat = analyticGroups.filter(group => (group.name.get() == "Bâtiment" || group.name.get() == "Batiment" || group.name.get() == "Building"));
-        let flr = analyticGroups.filter(group => (group.name.get() == "Etage" || group.name.get() == "Etages"));
-        let rom = analyticGroups.filter(group => (group.name.get() == "Pièces" || group.name.get() == "Pièce" || group.name.get() == "Pieces" || group.name.get() == "Piece"));
-        orderedAnalyticGroups = rom.concat(flr, bat);
-        return orderedAnalyticGroups;
-    }
-}
-exports.getAnalyticsGroup = getAnalyticsGroup;
-/**
- *
- * Function that calculate the sum of all endpoints current values given in parameter
- * @export
- * @param {*} bmsEndpoints - list of endpoint nodes
- * @return {*}
- */
-async function sumTimeSeriesOfBmsEndpoints(bmsEndpoints) {
-    let sum = 0;
-    for (let bms of bmsEndpoints) {
-        let timeSeries = await SpinalServiceTimeserie.getTimeSeries(bms.id.get());
-        if (timeSeries !== undefined) {
-            let currentData = await timeSeries.getCurrent();
-            if (currentData != undefined) {
-                sum += currentData.value;
-            }
-        }
-    }
-    return sum;
-}
-exports.sumTimeSeriesOfBmsEndpoints = sumTimeSeriesOfBmsEndpoints;
-/**
- *
- * Function that calculate the sum of all endpoints values differences between last hour and current value
- * @export
- * @param {*} bmsEndpoints - list of endpoint nodes
- * @return {*}
- */
-async function sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour(bmsEndpoints) {
-    let sum = 0;
-    const end = new Date();
-    end.setMinutes(1, 0, 0);
-    const start = new Date();
-    start.setHours(start.getHours() - 1, -1, 0, 0);
-    if (bmsEndpoints.length !== 0) {
-        for (let bms of bmsEndpoints) {
-            let timeSeries = await SpinalServiceTimeserie.getTimeSeries(bms.id.get());
-            let valueLastHour = undefined;
-            let value = undefined;
-            let data = await timeSeries.getFromIntervalTimeGen(start, end);
-            for await (const x of data) {
-                // if(x.value > 0){                  //Prendre que la valeur positif d'un compteur
-                if (!valueLastHour) {
-                    valueLastHour = x.value;
-                }
-                value = x.value;
-                // }
-            }
-            console.log("h-1 value:", valueLastHour, " | current value:", value);
-            sum += (value - valueLastHour);
-        }
-        console.log(" TOTAL DIFFERENCE : ", sum);
-        return sum;
+        return rooms;
     }
     else {
-        return NaN;
+        return [];
     }
 }
-exports.sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour = sumTimeSeriesOfBmsEndpointsDifferenceFromLastHour;
+exports.getRooms = getRooms;
 /**
  *
  * Function that return the control endpoint that matches the nameFilter given in parameter
@@ -119,218 +53,79 @@ async function getControlEndpoint(nodeId, nameFilter) {
 exports.getControlEndpoint = getControlEndpoint;
 /**
  *
- * Function that returns all potential endpoints (parent of BmsDevice)
+ * Function that returns a list of all bms devices in a specific room
  * @export
- * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
- * @param {string} nameFilter - Substring of the endpoints name used to capture them
+ * @param {string} nodeId - Id of the room
  * @return {*}
  */
-async function getBmsDevices(nodeId) {
-    let result = [];
-    const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
-    const p1_nodes = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasEndPoint"]); // get BmsDevice
-    const p2_nodes = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasBmsDevice"]); // get BmsDevice
-    result = p1_nodes.concat(p2_nodes);
-    result = result.concat([node.info]);
+async function getBmsDevicesList(nodeId) {
+    const result = [];
+    const BimObjectList = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, ["hasBimObject"]); // gets the Bim Objects
+    for (const BimObject of BimObjectList) {
+        const bmsdevice = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(BimObject.id.get(), ["hasBmsDevice"]); // gets the bls devices
+        if (bmsdevice) {
+            result.push(...bmsdevice);
+        }
+    }
     return result;
 }
-exports.getBmsDevices = getBmsDevices;
+exports.getBmsDevicesList = getBmsDevicesList;
 /**
  *
- * Function that returns all endpoints whose name contains the nameFilter
+ * Function that filters a list of endpoints and returns the bmsEndpoints  whose name are in the filter list
  * @export
- * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
- * @param {string} nameFilter - Substring of the endpoints name used to capture them
+ * @param {*} bmsendpointList - List of bmsendpoints models
+ * @param {string} filters  Liste of endpoints names
  * @return {*}
  */
-async function getEndpoints(nodeId, nameFilter) {
-    const element_to_endpoint_relation = "hasEndPoint";
-    const node = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(nodeId);
-    const EndpointProfils = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(nodeId, [element_to_endpoint_relation]);
-    for (const endpointProfil of EndpointProfils) { // pour chaque profil de control endpoint
-        const endpointsModels = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(endpointProfil.id.get(), ["hasBmsEndpoint"]);
-        const endpoints = endpointsModels.map(el => el.get());
-        for (const endpoint of endpoints) {
-            if (endpoint.name.get() == nameFilter)
-                return endpoint.id.get();
-        }
-    }
-    return undefined;
-}
-exports.getEndpoints = getEndpoints;
-/**
- *
- * Function that gives a control endpoint current value from an object id and the name of the control endpoint
- * @export
- * @param {string} nodeId - Id of the object node ( building, room , floor, equipment)
- * @param {string} controlEndpoint - Exact name of the control endpoint
- * @return {*}
- */
-async function getValueFromControlEndpoint(nodeId, controlEndpoint) {
-    const node = await this.getControlEndpoint(nodeId, controlEndpoint);
-    if (node != false) {
-        const bmsEndpoint = await node.element.load();
-        return bmsEndpoint.get().currentValue;
-    }
-    return 0;
-}
-exports.getValueFromControlEndpoint = getValueFromControlEndpoint;
-/**
- *
- * Function that filters a list of endpoints and returns the bmsEndpoints attached to the endpoints and whose name contain the filter
- * @export
- * @param {*} endpointList - List of endpoints nodes
- * @param {string} filter
- * @return {*}
- */
-async function filterBmsEndpoint(endpointList, filter) {
+function filterBmsEndpointList(bmsendpointList, filters) {
     let outputBmsEndpoint = [];
-    for (const endpoint of endpointList) {
-        let bmsEndpointGroups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpointGroup"]);
-        if (bmsEndpointGroups.length != 0) {
-            for (const group of bmsEndpointGroups) {
-                let bmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get(), ["hasBmsEndpoint"]);
-                for (const bms of bmsEndpoints) {
-                    if (bms.name.get().includes(filter))
-                        outputBmsEndpoint.push(bms);
-                }
-            }
-        }
-        else {
-            let bmsEndpoints = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(endpoint.id.get(), ["hasBmsEndpoint"]);
-            for (const bms of bmsEndpoints) {
-                if (bms.name.get().includes(filter))
-                    outputBmsEndpoint.push(bms);
-            }
+    for (const bmsendpoint of bmsendpointList) {
+        if (filters.some(filter => filters.includes(bmsendpoint.name.get()))) {
+            console.log(`Matching bmsendpoint: ${bmsendpoint.name.get()}, Filters: ${filters.join(", ")}\n`);
+            outputBmsEndpoint.push(bmsendpoint);
         }
     }
     return outputBmsEndpoint;
 }
-exports.filterBmsEndpoint = filterBmsEndpoint;
+exports.filterBmsEndpointList = filterBmsEndpointList;
 /**
- *
- * Function that calculate an analytic value using the control endpoints of children nodes
- * @export
- * @param {string} elementId - Id of the object node we want to calculate analytic value of
- * @param {("geographicFloor" | "geographicBuilding")} typeOfElement - Type of the object node, either building or floor
- * @param {string} controlEndpointName - Name of the control endpoint used
- * @return {*} - Result is the average of all child nodes values contributing to the calculation
+ * Function that calculates the average from a list of endpoints values
+ * @param EndpointsList
+ * @returns
  */
-async function calculateAnalyticsFromChildren(elementId, typeOfElement, controlEndpointName) {
-    if (typeOfElement == "geographicFloor") {
-        // on récupère les rooms dans l'étage
-        const rooms = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasGeographicRoom"]);
-        // Pour chaque room
-        let res = 0;
-        let count = 0;
-        for (const room of rooms) {
-            const monitorable = await getControlEndpoint(room.id.get(), "Monitorable");
-            if (monitorable != false) {
-                const valueMonitorable = await monitorable.element.load();
-                // Si la room est monitorée
-                if (valueMonitorable.get().currentValue == "Monitorée") {
-                    // On récupère le controlEndpoint
-                    const controlEndpoint = await getControlEndpoint(room.id.get(), controlEndpointName);
-                    if (controlEndpoint != false) {
-                        const loaded = await controlEndpoint.element.load();
-                        let val = loaded.get().currentValue;
-                        if (!isNaN(val)) {
-                            res = res + val;
-                            count += 1;
-                        }
-                    }
-                }
-            }
-        } // fin boucle sur les rooms
-        if (count == 0)
-            return NaN;
-        return res / count;
+async function CalculateAnalytic(EndpointsList) {
+    let values = [];
+    let analytic = {
+        average: NaN,
+        minimum: NaN,
+        maximum: NaN
+    };
+    for (const endpoint of EndpointsList) {
+        const loaded = await endpoint.element.load();
+        let value = loaded.currentValue.get();
+        if (!Number.isNaN(value)) {
+            values.push(value);
+        }
+        else {
+            console.log("The value is NaN", endpoint.name.get());
+        }
     }
-    else if (typeOfElement == "geographicBuilding") {
-        const floors = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasGeographicFloor"]);
-        let res = 0;
-        let count = 0;
-        for (const floor of floors) {
-            // On récupère le controlEndpoint
-            const controlEndpoint = await getControlEndpoint(floor.id.get(), controlEndpointName);
-            if (controlEndpoint != false) {
-                const loaded = await controlEndpoint.element.load();
-                let val = loaded.get().currentValue;
-                if (!isNaN(val)) {
-                    //console.log("floor ",val);
-                    res = res + val;
-                    count += 1;
-                }
-            }
-        } // fin boucle sur les floors
-        if (count == 0)
-            return NaN;
-        return res / count;
+    if (values.length > 0) {
+        const sum = values.reduce((acc, curr) => acc + curr, 0);
+        analytic.average = sum / values.length;
+        analytic.minimum = Math.min(...values);
+        analytic.maximum = Math.max(...values);
     }
+    return analytic;
 }
-exports.calculateAnalyticsFromChildren = calculateAnalyticsFromChildren;
-// Rajouter la même fonction sans la division ( juste somme pour consommation eau globale par exemple )
-async function calculateAnalyticsFromChildrenNoAverage(elementId, typeOfElement, controlEndpointName) {
-    if (typeOfElement == "geographicFloor") {
-        // on récupère les rooms dans l'étage
-        const rooms = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasGeographicRoom"]);
-        // Pour chaque room
-        let res = 0;
-        let count = 0;
-        for (const room of rooms) {
-            const monitorable = await getControlEndpoint(room.id.get(), "Monitorable");
-            if (monitorable != false) {
-                const valueMonitorable = await monitorable.element.load();
-                // Si la room est monitorée
-                if (valueMonitorable.get().currentValue == "Monitorée") {
-                    // On récupère le controlEndpoint
-                    const controlEndpoint = await getControlEndpoint(room.id.get(), controlEndpointName);
-                    if (controlEndpoint != false) {
-                        const loaded = await controlEndpoint.element.load();
-                        let val = loaded.get().currentValue;
-                        if (!isNaN(val)) {
-                            res = res + val;
-                            count += 1;
-                        }
-                    }
-                }
-            }
-        } // fin boucle sur les rooms
-        if (count == 0)
-            return NaN;
-        return res;
-    }
-    else if (typeOfElement == "geographicBuilding") {
-        const floors = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(elementId, ["hasGeographicFloor"]);
-        let res = 0;
-        let count = 0;
-        for (const floor of floors) {
-            // On récupère le controlEndpoint
-            const controlEndpoint = await getControlEndpoint(floor.id.get(), controlEndpointName);
-            // console.log(controlEndpoint);
-            if (controlEndpoint != false) {
-                const loaded = await controlEndpoint.element.load();
-                let val = loaded.get().currentValue;
-                if (!isNaN(val)) {
-                    res = res + val;
-                    count += 1;
-                }
-            }
-        } // fin boucle sur les floors
-        if (count == 0)
-            return NaN;
-        return res;
-    }
-}
-exports.calculateAnalyticsFromChildrenNoAverage = calculateAnalyticsFromChildrenNoAverage;
+exports.CalculateAnalytic = CalculateAnalytic;
 /**
- *
- * Function that updates a control endpoint value
- * @export
- * @param {*} target - Node to update
- * @param {*} valueToPush - The new value
- * @param {*} dataType - Type of the data ( see InputDataEndpoint data types)
- * @param {*} type - Type ( not really used )
+ * Function that updates the current value of a controlenPoint with the average calculated in CalculateAnalytic
+ * @param target
+ * @param valueToPush
+ * @param dataType
+ * @param type
  */
 async function updateControlEndpointWithAnalytic(target, valueToPush, dataType, type) {
     if (valueToPush != undefined) {
@@ -352,49 +147,16 @@ async function updateControlEndpointWithAnalytic(target, valueToPush, dataType, 
     }
 }
 exports.updateControlEndpointWithAnalytic = updateControlEndpointWithAnalytic;
+/**
+ *
+ * @param endpointList
+ * @param target
+ * @returns
+ */
 function removeFromlist(endpointList, target) {
     return endpointList.filter(x => {
         return !target.includes(x.name.get());
     });
 }
 exports.removeFromlist = removeFromlist;
-async function TimeSeriesOfBmsEndpointsMeanFromLastHour(bmsEndpoints) {
-    let mean = 0;
-    let dateInter = {
-        end: new Date(),
-        start: new Date()
-    };
-    dateInter.end.setMinutes(1, 0, 0);
-    dateInter.start.setHours(dateInter.start.getHours() - 1, -1, 0, 0);
-    let length = bmsEndpoints.length;
-    if (length !== 0) {
-        for (let bms of bmsEndpoints) {
-            let val = await SpinalServiceTimeserie.getMean(bms.id.get(), dateInter);
-            if (isNaN(val)) {
-                length--;
-            }
-            else {
-                mean += val;
-            }
-        }
-        console.log(" MOYENNE TOTAL : ", mean);
-        return mean;
-    }
-    else {
-        return NaN;
-    }
-}
-exports.TimeSeriesOfBmsEndpointsMeanFromLastHour = TimeSeriesOfBmsEndpointsMeanFromLastHour;
-async function getAttributeForWaterConsumption() {
-    let spatialId = (spinal_env_viewer_graph_service_1.SpinalGraphService.getContextWithType("geographicContext"))[0].info.id.get();
-    let buildingId = (await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(spatialId, ["hasGeographicBuilding"]))[0].id.get();
-    let buildingNode = spinal_env_viewer_graph_service_1.SpinalGraphService.getRealNode(buildingId);
-    const attribute = (await spinal_env_viewer_plugin_documentation_service_1.default.findOneAttributeInCategory(buildingNode, "Analysis settings", "water consumption/hour"));
-    if (attribute !== -1) {
-        let attrVal = attribute.value.get();
-        return attrVal;
-    }
-    return undefined;
-}
-exports.getAttributeForWaterConsumption = getAttributeForWaterConsumption;
 //# sourceMappingURL=utils.js.map

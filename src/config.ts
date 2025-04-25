@@ -35,5 +35,7 @@ export default {
   hubHost: process.env.HUB_HOST,
   hubPort: parseInt(process.env.HUB_PORT),
   digitalTwinPath: process.env.DIGITALTWIN_PATH,
+  TempEndpoints: ["Temp.ambiante", "Température air intérieur","Température ambiante"],
+  Co2Endpoints:["Concentration CO2", "Concentration CO2 (ppm)"]
 //   NODE_ENV: process.env.NODE_ENV,
 };

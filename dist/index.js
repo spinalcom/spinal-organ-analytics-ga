@@ -26,17 +26,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const spinal_core_connectorjs_type_1 = require("spinal-core-connectorjs_type");
 const config_1 = require("./config");
 const spinal_env_viewer_graph_service_1 = require("spinal-env-viewer-graph-service");
-const spinal_env_viewer_plugin_analytics_service_1 = require("spinal-env-viewer-plugin-analytics-service");
 const spinal_model_bmsnetwork_1 = require("spinal-model-bmsnetwork");
 const utils = require("./utils");
-const ticket = require("./ticketAnalytics");
-const globalAnalytics = require("./globalAnalytics");
-const gtbAnalytics = require("./gtbAnalytics");
-const prodAnalytics = require("./prodAnalytics");
-const cron = require("node-cron");
 class SpinalMain {
     constructor() {
-        const url = `https://${config_1.default.userId}:${config_1.default.userPassword}@${config_1.default.hubHost}:${config_1.default.hubPort}/`;
+        const url = `http://${config_1.default.userId}:${config_1.default.userPassword}@${config_1.default.hubHost}:${config_1.default.hubPort}/`;
         this.connect = spinal_core_connectorjs_type_1.spinalCore.connect(url);
     }
     /**
@@ -56,193 +50,80 @@ class SpinalMain {
         });
     }
     /**
-     * Function to update all control endpoints that have an analytic named exactly after them and linked to the same objects (building, floor, room).
+     * Function to update controle enpoints in rooms with bmsdevices that have bmsendpoints contained in the bmsendpoints filter lists (co2 and temperature)
      * @memberof SpinalMain
      */
     async updateControlEndpoints() {
-        // const analytics = await this.getAnalytics();
-        const analyticGroups = await utils.getAnalyticsGroup();
-        const ticketStepIds = await ticket.ticketsOuvertsFilter();
-        console.log("Ticket Filter Set !");
-        let iMon1 = 0; // monitorable
-        let iMon2 = 0; // monitorable mais non monitoré
-        let iMon3 = 0; // non monitorable
-        for (const analyticGroup of analyticGroups) {
-            const analytics = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analyticGroup.id.get(), ["groupHasAnalytic"]);
-            for (const analytic of analytics) {
-                // récupération du nom de l'analytic et du type d'analytic ciblé
-                let analyticChildrenType = analytic.childrenType.get();
-                let analyticName = analytic.name.get();
-                // if(analyticName == "Monitorable") continue;
-                // if(analyticName == "Nombre de tickets") continue;
-                // if(analyticName == "Taux d'occupation") continue;
-                // if(analyticName == "Qualité de l'air") continue;
-                // if(analyticName == "Luminosité") continue;
-                // if(analyticName == "Temperature moyenne") continue;
-                const groups = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(analytic.id.get(), [spinal_env_viewer_plugin_analytics_service_1.spinalAnalyticService.ANALYTIC_TO_GROUP_RELATION]);
-                for (const group of groups) {
-                    const elements = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(group.id.get()); // récupération du groupe auquel est lié l'analytic
-                    for (const element of elements) {
-                        // récupération des noeuds du bon type
-                        const typeOfElement = element.type.get();
-                        if (typeOfElement == analyticChildrenType) {
-                            // Récupération du controlpoint lié avec le nom de l'analytic
-                            let controlBmsEndpoint = await utils.getControlEndpoint(element.id.get(), analyticName); // sortie
-                            if (controlBmsEndpoint != false) {
-                                let analyticsResult = undefined;
-                                switch (analyticName) {
-                                    case "Energie globale":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalEnergy(element.id.get(), typeOfElement);
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Chauffage":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalHeat(element.id.get(), typeOfElement);
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Climatisation":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalAirConditioning(element.id.get(), typeOfElement);
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Eclairage":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalLighting(element.id.get(), typeOfElement);
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Eau sanitaire":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalWaterToilet(element.id.get(), typeOfElement);
-                                        analyticsResult = (Math.round(analyticsResult * 1000) / 1000) * 1000; //Transformer le m3 en Litres
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Eau globale":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsGlobalWater(element.id.get(), typeOfElement);
-                                        analyticsResult = (Math.round(analyticsResult * 1000) / 1000) * 1000; //Transformer le m3 en Litres
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Nombre de personnes":
-                                        analyticsResult = await globalAnalytics.calculateAnalyticsNumberOfPersons(element.id.get(), typeOfElement);
-                                        analyticsResult = (Math.round(analyticsResult));
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Production d'énergie":
-                                        analyticsResult = await prodAnalytics.calculateAnalyticsEnergyProduction(element.id.get());
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Ensoleillement":
-                                        analyticsResult = await prodAnalytics.calculateAnalyticsSunlightProduction(element.id.get());
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    // case "Efficacité de production d'énergie solaire":
-                                    //     break;
-                                    case "Gain en émission de CO2":
-                                        analyticsResult = await prodAnalytics.calculateAnalyticsCO2Gain(element.id.get());
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Taux d'autoconsommation énergétique":
-                                        analyticsResult = await prodAnalytics.calculateAnalyticsAutoConsumption(element.id.get());
-                                        analyticsResult = Math.round(analyticsResult * 1000) / 1000;
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    // case "Nombre d'espaces occupés":
-                                    //     break;
-                                    // case "Qualité de l'air":
-                                    //     if(typeOfElement == "geographicRoom"){
-                                    //         analyticsResult = await gtbAnalytics.calculateAnalyticsAirQuality(element.id.get());
-                                    //         analyticsResult = Math.round(analyticsResult*100)/100;
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     else {
-                                    //         analyticsResult = await utils.calculateAnalyticsFromChildren(element.id.get(), typeOfElement,"Qualité de l'air");
-                                    //         analyticsResult = Math.round(analyticsResult*100)/100;
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     break;
-                                    // case "Luminosité":
-                                    //     if(typeOfElement == "geographicRoom"){
-                                    //         analyticsResult = await gtbAnalytics.calculateAnalyticsLuminosity(element.id.get());
-                                    //         analyticsResult = Math.round(analyticsResult*100)/100;
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     else {
-                                    //         analyticsResult = await utils.calculateAnalyticsFromChildren(element.id.get(), typeOfElement,"Luminosité");
-                                    //         analyticsResult = Math.round(analyticsResult*100)/100;
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     break;
-                                    // case "Temperature moyenne":
-                                    //     if(typeOfElement == "geographicRoom"){
-                                    //         analyticsResult = await gtbAnalytics.calculateAnalyticsTemperature(element.id.get());
-                                    //         analyticsResult = Math.round(analyticsResult*100)/100;
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     else {
-                                    //         analyticsResult = await utils.calculateAnalyticsFromChildren(element.id.get(), typeOfElement,"Temperature moyenne");
-                                    //         analyticsResult = Math.round(analyticsResult*100)/100;
-                                    //         await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     break;
-                                    // case "Taux d'occupation":
-                                    //     if(typeOfElement == "geographicRoom"){
-                                    //         analyticsResult = await gtbAnalytics.calculateAnalyticsOccupationRate(element.id.get());
-                                    //         // await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     else {
-                                    //         analyticsResult = await utils.calculateAnalyticsFromChildren(element.id.get(), typeOfElement,"Taux d'occupation");
-                                    //         // await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, InputDataEndpointDataType.Real, InputDataEndpointType.Other);
-                                    //         console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                    //     }
-                                    //     break;
-                                    case "Nombre de tickets":
-                                        await ticket.updateTicketControlPoints(element.id.get(), typeOfElement, controlBmsEndpoint, ticketStepIds);
-                                        console.log(analyticName + " for " + element.name.get() + " updated : " + typeOfElement);
-                                        break;
-                                    case "Monitorable":
-                                        analyticsResult = await gtbAnalytics.calculateAnalyticsMonitorable(element.id.get());
-                                        await utils.updateControlEndpointWithAnalytic(controlBmsEndpoint, analyticsResult, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Enumerated, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
-                                        console.log(analyticName + " for " + typeOfElement + " updated !!!");
-                                        if (analyticsResult == "Monitorée")
-                                            iMon1++;
-                                        else if (analyticsResult == "Monitorable mais non monitorée")
-                                            iMon2++;
-                                        else if (analyticsResult == "Non monitorable")
-                                            iMon3++;
-                                        break;
-                                    default:
-                                        // console.log(analyticName + " : aucun trouvé pour : " + typeOfElement);
-                                        break;
-                                }
-                            }
+        const Tempfilter = config_1.default.TempEndpoints;
+        const Co2filter = config_1.default.Co2Endpoints;
+        const Rooms = await utils.getRooms();
+        if (Rooms.length !== 0) {
+            for (const room of Rooms) {
+                const bmsdevices = await utils.getBmsDevicesList(room.id.get());
+                let TempList = [];
+                let CO2List = [];
+                if (bmsdevices.length !== 0) {
+                    console.log(`Filter process for the room: ${room.name.get()} \n`);
+                    for (const device of bmsdevices) {
+                        const endpointList = await spinal_env_viewer_graph_service_1.SpinalGraphService.getChildren(device.id.get(), ["hasBmsEndpoint"]);
+                        if (endpointList.length !== 0) {
+                            console.log(`EndPoints found for device : ${device.name.get()} \n`);
+                            const TempEndpoint = utils.filterBmsEndpointList(endpointList, Tempfilter);
+                            const CO2Endpoint = utils.filterBmsEndpointList(endpointList, Co2filter);
+                            TempList = TempList.concat(TempEndpoint);
+                            CO2List = CO2List.concat(CO2Endpoint);
+                        }
+                        else {
+                            console.log(`No endpoint found for bmsDevice: ${device.name.get()} ==> room: ${room.name.get()}`);
                         }
                     }
                 }
+                else {
+                    console.log(`No bmsDevice found in the room: ${room.name.get()}`);
+                }
+                const tempNames = TempList.map(temp => temp.name.get());
+                const CO2Names = CO2List.map(CO2 => CO2.name.get());
+                console.log(`Temp bmsEndpoints found:\n`, tempNames);
+                console.log(`Co2 bmsEndpoints found:\n`, CO2Names);
+                const TempAnalytic = await utils.CalculateAnalytic(TempList);
+                const moyenneTemp = TempAnalytic.average;
+                const MinTemp = TempAnalytic.minimum;
+                const MaxTemp = TempAnalytic.maximum;
+                const Co2Analytic = await utils.CalculateAnalytic(CO2List);
+                const moyenneCo2 = Co2Analytic.average;
+                const MinCo2 = Co2Analytic.minimum;
+                const MaxCo2 = Co2Analytic.maximum;
+                console.log("moyenne Temp", moyenneTemp);
+                console.log("moyenne CO2", moyenneCo2);
+                let TempControlEndPoint = await utils.getControlEndpoint(room.id.get(), "Température");
+                let MinTempControlEndPoint = await utils.getControlEndpoint(room.id.get(), "Min température");
+                let MaxTempControlEndPoint = await utils.getControlEndpoint(room.id.get(), "Max température");
+                if (TempControlEndPoint != false) {
+                    await utils.updateControlEndpointWithAnalytic(TempControlEndPoint, moyenneTemp, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                    await utils.updateControlEndpointWithAnalytic(MinTempControlEndPoint, MinTemp, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                    await utils.updateControlEndpointWithAnalytic(MaxTempControlEndPoint, MaxTemp, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                    console.log("Temperature updated for " + room.name.get());
+                }
+                else {
+                    console.log(" NO temperature controlEndPoint Found");
+                }
+                let CO2ControlEndPoint = await utils.getControlEndpoint(room.id.get(), "Concentration CO2");
+                let MinCO2ControlEndPoint = await utils.getControlEndpoint(room.id.get(), "Min CO2");
+                let MaxCO2ControlEndPoint = await utils.getControlEndpoint(room.id.get(), "Max CO2");
+                if (CO2ControlEndPoint != false) {
+                    await utils.updateControlEndpointWithAnalytic(CO2ControlEndPoint, moyenneCo2, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                    await utils.updateControlEndpointWithAnalytic(MinCO2ControlEndPoint, MinCo2, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                    await utils.updateControlEndpointWithAnalytic(MaxCO2ControlEndPoint, MaxCo2, spinal_model_bmsnetwork_1.InputDataEndpointDataType.Real, spinal_model_bmsnetwork_1.InputDataEndpointType.Other);
+                    console.log(" CO2 concentration updated for " + room.name.get());
+                }
+                else {
+                    console.log("No CO2 controlEndPoint Found");
+                }
             }
         }
-        console.log("Pieces Monitorées = " + iMon1);
-        console.log("Pieces Non monitorables = " + iMon3);
-        console.log("Pieces Monitorables mais non monitorées = " + iMon2);
+        else {
+            console.log("No Room Found In Context");
+        }
         console.log("DONE");
     }
 }
@@ -265,14 +146,13 @@ async function job() {
     }
 }
 async function Main() {
-    // start every 1h+10min
     console.log('Organ Start');
-    cron.schedule('10 * * * *', async () => {
-        console.log('Analytic job Start');
-        await job();
-    });
+    /*cron.schedule('10 * * * *', async (): Promise<void> => {
+      console.log('Analytic job Start');
+      await job();
+    });*/
     // FOR DEBUG
-    // await job();
+    await job();
 }
 // Call main function
 Main();

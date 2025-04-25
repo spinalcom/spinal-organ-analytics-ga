@@ -14,6 +14,7 @@
   "author": "SERIR rayane",
   "license": "ISC",
   "dependencies": {
+    "@types/node": "^20.14.10",
     "dotenv": "^16.0.0",
     "node-cron": "^3.0.0",
     "spinal-core-connectorjs_type": "git+https://github.com/spinalcom/spinal-core-connectorjs_type.git",
@@ -28,8 +29,7 @@
     "spinal-model-timeseries": "git+https://github.com/spinalcom/spinal-model-timeseries.git"
   },
   "devDependencies": {
-    "@types/node": "^17.0.15",
     "@types/node-cron": "^3.0.1",
-    "typescript": "^4.4.3"
+    "typescript": "^4.9.5"
   }
 }
